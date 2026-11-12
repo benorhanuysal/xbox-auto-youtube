@@ -110,7 +110,7 @@ Kalite ve akıcılık: 4K ekran 1080p'ye **Lanczos** ile küçültülür (sahned
 
 Oynarken: uzaktan oynatma açıkken **Telegram kumandasından** 🔴 *Yayını başlat* (PC'den yükselen üç bip; Kick'e bağlanınca telefona "Yayın başladı" gelir), ⏹ *Yayını bitir*. Kayıt da açılır; yayının videosu da YouTube kurgusuna girer. OBS 30 sn'de Kick'e bağlanamazsa telefona haber gelir.
 
-- **Canlı Türkçe altyazı:** `yayin/altyazi.html` yayın OBS'inde tarayıcı kaynağı olarak Luna'nın çevirilerini gösterir (TV uygulamasıyla aynı akış). Ortadaki 600 px'lik sütunda durur, oyunun İngilizce altyazısını örtmez.
+- **Canlı Türkçe katman:** `yayin/altyazi.html` yayın OBS'inde tarayıcı kaynağıdır. Altyazı motorunun (xbox-samsung-subtitles-tv `motor/`) konumlu olaylarına bağlanır (`ws://127.0.0.1:2333/api/ws/olay`). Hem alttaki altyazının hem sol üstteki görev/ipucu kutusunun Türkçesini İngilizcenin **tam üstüne, tam siyah zeminle** yazar (İngilizce görünmez), TV'dekiyle aynı. Önizleme: `?test=1`.
 - **Mahremiyet:** OBS PC ekranının tamamını yakalar. Yayındayken bekçinin bildirimleri susar; uzaktan oynatma 4 sn kesilirse yayındaki ekran gizlenir (izleyici siyah ekran görür, masaüstünü değil); oturum bitince (1 dk) yayın kendiliğinden kapanır. Diğer uygulamaların bildirimleri için Windows'ta *Ayarlar → Sistem → Bildirimler → Rahatsız etmeyi otomatik aç → Tam ekran modunda bir uygulama kullanırken*'i aç.
 - **Luna:** Uzaktan oynatma başlayınca kapalıysa bekçi açar (`luna_oto_baslat`).
 

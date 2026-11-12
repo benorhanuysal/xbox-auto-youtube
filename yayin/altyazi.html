@@ -1,86 +1,106 @@
 <!doctype html>
-<!-- Canli yayin icin Turkce altyazi katmani (OBS tarayici kaynagi, 1920x1080, saydam).
-     LunaTranslator'in yerel servisine baglanir: ws://127.0.0.1:2333/api/ws/text/trans (TV uygulamasiyla ayni akis).
-     Kutu ortadaki 600 px'lik sutunda durur: kayittan dikey (9:16) Shorts kesilince altyazi kirpilmaz.
-     Oyunun Ingilizce altyazisinin (ekranin alt ~%19'u) ustunde kalir, onu ortmez.
-     Adres parametreleri: ?port=2333  ?alt=215 (alttan px)  ?test=1 (ornek satirlar) -->
+<!-- Canli yayin icin Turkce katman (OBS tarayici kaynagi, 1920x1080, saydam).
+     Altyazi motorunun konumlu olaylarina baglanir: ws://127.0.0.1:2333/api/ws/olay
+       {"tur":"goster","bolge":"alt"|"ipucu","kutu":[x,y,gen,yuk] (ekranin 0-1 orani),"tr":"...","en":"..."}
+       {"tur":"gizle","bolge":"..."}
+     Her Turkce metin Ingilizcenin TAM USTUNE siyah zeminle yazilir (Ingilizceyi ortur):
+       - alt (altyazi): Ingilizce gitse de Turkce okuma suresi dolana kadar kalir; kutu yukari dogru buyuyebilir
+       - ipucu (sol ust gorev kutusu): Ingilizce kutu kapaninca hemen kaybolur; kutu asagi dogru buyuyebilir
+     Adres parametreleri: ?port=2333  ?test=1 (ornek kutular) -->
 <html lang="tr">
 <head>
 <meta charset="utf-8">
-<title>Turkce altyazi</title>
+<title>Turkce katman</title>
 <style>
   html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
-  #kutu {
-    position: absolute; left: 50%; transform: translateX(-50%); bottom: 215px; width: 600px;
-    display: flex; flex-direction: column; align-items: center;
-    font-family: "Segoe UI", Arial, sans-serif;
+  .kapak {
+    position: absolute; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+    /* Tam siyah: yari saydam zeminde alttaki Ingilizce silik de olsa okunuyordu */
+    background: #000; border-radius: 6px; padding: 6px 14px;
+    color: #fff; font-family: "Segoe UI", Arial, sans-serif; font-weight: 400; line-height: 1.22;
+    text-align: center; transition: opacity 0.3s;
   }
-  .satir {
-    max-width: 600px; box-sizing: border-box; margin-top: 6px; padding: 3px 14px 5px;
-    border-radius: 8px; background: rgba(0, 0, 0, 0.62);
-    color: #fff; font-size: 38px; font-weight: 700; line-height: 1.22; text-align: center;
-    text-shadow: 0 2px 3px #000; transition: opacity 0.35s, font-size 0.2s;
-  }
-  .satir.eski { opacity: 0.55; font-size: 30px; }
-  .satir.sonuyor { opacity: 0; }
+  .kapak.ipucu { text-align: left; justify-content: flex-start; align-items: flex-start; }
+  .kapak.gizli { opacity: 0; }
 </style>
 </head>
 <body>
-<div id="kutu"></div>
 <script>
 (function () {
   'use strict';
+  var W = 1920, H = 1080, PAY = 14;  // OCR kutusu harf kenarina tam oturur; Ingilizce tasmasin diye pay
   var p = new URLSearchParams(location.search);
   var PORT = p.get('port') || '2333';
-  var EN_FAZLA_SATIR = 2;
-  var kutu = document.getElementById('kutu');
-  if (p.get('alt')) kutu.style.bottom = parseInt(p.get('alt'), 10) + 'px';
+  var kutular = {};   // bolge -> {el, zamanlayici, gosterildi, metin}
 
-  function kaldir(el) {
-    if (!el.parentNode || el.classList.contains('sonuyor')) return;
-    el.classList.add('sonuyor');
-    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
+  function okumaSuresi(metin) { return Math.min(6000, 2000 + metin.length * 60); }
+
+  function kutuAl(bolge) {
+    if (!kutular[bolge]) {
+      var el = document.createElement('div');
+      el.className = 'kapak gizli ' + bolge;
+      document.body.appendChild(el);
+      kutular[bolge] = { el: el, zamanlayici: null, gosterildi: 0, metin: '' };
+    }
+    return kutular[bolge];
   }
 
-  function goster(metin) {
-    metin = String(metin || '').trim();
-    if (!metin) return;
-    var eskiler = kutu.querySelectorAll('.satir:not(.sonuyor)');
-    if (eskiler.length && eskiler[eskiler.length - 1].textContent === metin) return;
-    for (var i = 0; i < eskiler.length; i++) {
-      eskiler[i].classList.add('eski');
-      if (i <= eskiler.length - EN_FAZLA_SATIR) kaldir(eskiler[i]);
+  function sigdir(el, enBuyuk, enKucuk, azamiYukseklik) {
+    // Turkce Ingilizceden uzun olabilir: kutuya sigana kadar kucult
+    for (var b = enBuyuk; b >= enKucuk; b--) {
+      el.style.fontSize = b + 'px';
+      if (el.scrollHeight <= azamiYukseklik && el.scrollWidth <= el.clientWidth + 1) return;
     }
-    var el = document.createElement('div');
-    el.className = 'satir';
-    el.textContent = metin;
-    kutu.appendChild(el);
-    // Ekranda kalma: uzunluga gore 4-10 sn (TV uygulamasiyla ayni)
-    setTimeout(function () { kaldir(el); }, Math.min(10000, Math.max(4000, metin.length * 90)));
   }
 
-  function mesajdanMetin(veri) {
-    // Luna duz metin ya da JSON gonderebilir
-    if (typeof veri !== 'string') return '';
-    var t = veri.trim();
-    if (t.charAt(0) === '{' || t.charAt(0) === '[') {
-      try {
-        var j = JSON.parse(t);
-        if (Array.isArray(j)) j = j[j.length - 1];
-        if (j && typeof j === 'object') return j.result || j.text || j.trans || j.translation || j.content || '';
-      } catch (e) { /* duz metin */ }
+  function goster(o) {
+    var k = kutuAl(o.bolge);
+    clearTimeout(k.zamanlayici);
+    var x = o.kutu[0] * W, y = o.kutu[1] * H, g = o.kutu[2] * W, h = o.kutu[3] * H;
+    var el = k.el;
+    el.textContent = o.tr;
+    el.style.left = Math.max(0, x - PAY) + 'px';
+    el.style.width = (g + 2 * PAY) + 'px';
+    el.style.height = 'auto';
+    el.style.minHeight = (h + 2 * PAY) + 'px';
+    // Satir yuksekligi Ingilizce yazidan tahmin: alt yazi ~2 satir, ipucu ~3 satir
+    var satir = Math.max(1, Math.round(h / (o.bolge === 'ipucu' ? 29 : 34)));
+    var boyut = Math.max(18, Math.min(40, Math.round(h / satir * 0.8)));
+    sigdir(el, boyut, 16, (h + 2 * PAY) * (o.bolge === 'ipucu' ? 2.2 : 1.9));
+    var yuk = el.offsetHeight;
+    if (o.bolge === 'alt') {
+      el.style.top = Math.max(0, y + h + PAY - yuk) + 'px';  // alt kenar sabit, yukari buyur
+    } else {
+      el.style.top = Math.max(0, y - PAY) + 'px';            // ust kenar sabit, asagi buyur
     }
-    return t;
+    el.classList.remove('gizli');
+    k.gosterildi = Date.now();
+    k.metin = o.tr;
+  }
+
+  function gizle(o) {
+    var k = kutular[o.bolge];
+    if (!k) return;
+    clearTimeout(k.zamanlayici);
+    var kalan = o.bolge === 'alt' ? Math.max(0, k.gosterildi + okumaSuresi(k.metin) - Date.now()) : 0;
+    k.zamanlayici = setTimeout(function () { k.el.classList.add('gizli'); }, kalan);
+  }
+
+  function isle(veri) {
+    var o;
+    try { o = JSON.parse(veri); } catch (e) { return; }
+    if (o.tur === 'goster' && o.kutu && o.tr) goster(o);
+    else if (o.tur === 'gizle') gizle(o);
   }
 
   var bekleme = 1000;
   function baglan() {
     var ws;
-    try { ws = new WebSocket('ws://127.0.0.1:' + PORT + '/api/ws/text/trans'); }
+    try { ws = new WebSocket('ws://127.0.0.1:' + PORT + '/api/ws/olay'); }
     catch (e) { return yeniden(); }
     ws.onopen = function () { bekleme = 1000; };
-    ws.onmessage = function (ev) { goster(mesajdanMetin(ev.data)); };
-    ws.onclose = yeniden;  // Luna kapaliysa/yeniden acildiysa kendiliginden baglanir
+    ws.onmessage = function (ev) { isle(ev.data); };
+    ws.onclose = yeniden;  // motor kapaliysa/yeniden acildiysa kendiliginden baglanir
   }
   function yeniden() {
     setTimeout(baglan, bekleme);
@@ -88,8 +108,10 @@
   }
 
   if (p.get('test')) {
-    goster('Lester yine bir iş ayarlamış, ama bu sefer işin içinde bir bit yeniği var.');
-    setTimeout(function () { goster('Hadi, gidelim! Polisler her an burada olabilir!'); }, 1200);
+    goster({ bolge: 'alt', kutu: [0.2354, 0.8694, 0.5276, 0.062],
+             tr: 'Prix Luxury Real Estate mülklerine sanat stüdyoları kuruyor. Gördün mü?' });
+    goster({ bolge: 'ipucu', kutu: [0.0698, 0.0759, 0.2146, 0.0731],
+             tr: "Kortz Center Soygununa erişmek için prixluxuryrealestate.com'dan malikânene Sanat Stüdyosu satın al." });
   }
   baglan();
 })();
