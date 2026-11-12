@@ -10,6 +10,13 @@ VARSAYILAN = {
     "kayit_klasoru": "",
     # LunaTranslator'in userconfig klasoru: Turkce altyazi gunlugu ve Gemini anahtari buradan okunur.
     "luna_userconfig": "",
+    # Kurgu planini kim yapsin, sirayla denenir. "claude": bilgisayardaki Claude Code (abonelikle, ek ucret yok);
+    # "gemini": Gemini API (ucretsiz kota). Hicbiri olmazsa puana gore basit plan.
+    "planlayicilar": ["claude", "gemini"],
+    # Bos: Claude Code'un varsayilan modeli. Ornek: "sonnet", "opus"
+    "claude_model": "",
+    # Claude'a sahnelerden kare seritleri de goster (goruntuye bakarak secsin)
+    "claude_kare": True,
     # Bos ise Luna'daki Gemini anahtari kullanilir (ayni anahtari iki yere yazmayin).
     "gemini_anahtari": "",
     # Sirayla denenir; ilki mesgulse (503) sonraki.

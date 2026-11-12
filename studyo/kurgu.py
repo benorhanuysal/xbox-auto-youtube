@@ -95,6 +95,19 @@ def kucuk_resim(kaynak, t, cikti):
                "-q:v", "3", os.path.abspath(cikti)], os.path.dirname(os.path.abspath(cikti)))
 
 
+def kare_seridi(kaynak, bas, son, cikti, genislik=400):
+    """Sahnenin basindan, ortasindan ve sonundan 3 kare, yan yana tek resim (yapay zeka goruntuye baksin)."""
+    sure = son - bas
+    girdiler, filtre = [], []
+    for i, oran in enumerate((0.15, 0.5, 0.85)):
+        girdiler += ["-ss", "%.2f" % (bas + sure * oran), "-i", os.path.abspath(kaynak)]
+        filtre.append("[%d:v]scale=%d:-2,setsar=1[k%d]" % (i, genislik, i))
+    filtre.append("[k0][k1][k2]hstack=inputs=3[v]")
+    _calistir(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *girdiler, "-filter_complex", ";".join(filtre),
+               "-map", "[v]", "-frames:v", "1", "-q:v", "4", os.path.abspath(cikti)],
+              os.path.dirname(os.path.abspath(cikti)))
+
+
 def video_yap(kaynak, parcalar, cikti, bicim, satirlar, baslik=None, altyazi_gom=True, gunluk=print):
     """parcalar: [[bas, son], ...] -> tek video."""
     klasor = os.path.dirname(os.path.abspath(cikti))

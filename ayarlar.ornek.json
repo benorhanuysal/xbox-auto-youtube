@@ -1,6 +1,8 @@
 {
   "kayit_klasoru": "",
   "luna_userconfig": "",
+  "planlayicilar": ["claude", "gemini"],
+  "claude_model": "",
   "gemini_anahtari": "",
   "oyun": "GTA V",
   "kanal": "Night Drive Club",

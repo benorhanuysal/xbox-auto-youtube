@@ -2,7 +2,7 @@
   python -m studyo                 en yeni OBS kaydini isle
   python -m studyo "kayit.mkv"     belirli bir kaydi isle
   python -m studyo --sadece-plan   video uretmeden plani goster
-  python -m studyo --gemini-yok    Gemini'siz (puana gore) plan
+  python -m studyo --planlayici gemini   yalnizca Gemini ile planla (claude / gemini / yok)
 """
 import argparse
 import datetime
@@ -11,7 +11,7 @@ import os
 import sys
 import time
 
-from . import aday, altyazi, ayar as ayar_modulu, gemini, kayit, kurgu, ses
+from . import aday, altyazi, ayar as ayar_modulu, kayit, kurgu, plan as plan_modulu, ses
 
 
 def _yaz(metin):
@@ -28,7 +28,8 @@ def main():
     ap = argparse.ArgumentParser(prog="studyo", description="OBS kaydindan Turkce altyazili uzun video + Shorts")
     ap.add_argument("kayit", nargs="?", help="video dosyasi (bos: en yeni kayit)")
     ap.add_argument("--sadece-plan", action="store_true")
-    ap.add_argument("--gemini-yok", action="store_true")
+    ap.add_argument("--planlayici", choices=["claude", "gemini", "yok"],
+                    help="yalnizca bunu kullan (varsayilan: ayarlar.json sirasi)")
     arg = ap.parse_args()
 
     ayar = ayar_modulu.yukle()
@@ -53,8 +54,8 @@ def main():
 
     adaylar = aday.adaylar(heyecan, ses_dizisi, satirlar, sure)
     _yaz("3/5 Aday sahne: %d, kurgu plani hazirlaniyor..." % len(adaylar))
-    anahtar = "" if arg.gemini_yok else ayar_modulu.gemini_anahtari(ayar)
-    plan = gemini.plan(adaylar, ayar, anahtar, _yaz)
+    planlayicilar = None if not arg.planlayici else ([] if arg.planlayici == "yok" else [arg.planlayici])
+    plan = plan_modulu.plan(adaylar, ayar, yol, cikti, _yaz, planlayicilar)
     with open(os.path.join(cikti, "plan.json"), "w", encoding="utf-8") as f:
         json.dump({"kayit": yol, "adaylar": adaylar, "plan": plan}, f, ensure_ascii=False, indent=2)
     uzun_sn = sum(s - b for b, s in plan["uzun"]["parcalar"])
