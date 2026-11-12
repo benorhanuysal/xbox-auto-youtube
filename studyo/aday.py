@@ -1,4 +1,5 @@
-"""Aday sahneler: sesin tepe yaptigi anlar + diyalog kumeleri. Gemini bunlarin arasindan secer."""
+"""Aday sahneler: sesin tepe yaptigi anlar + diyalog kumeleri + kanal sahibinin konustugu anlar.
+Planlayici (Claude/Gemini) bunlarin arasindan secer."""
 import numpy as np
 
 HEYECAN_ESIK = 7.0      # LU: cevresinden bu kadar yuksek ses = olay
@@ -9,6 +10,9 @@ EN_FAZLA_ADAY = 60
 # Isaret tusuna olaydan SONRA basilir: aksiyon isaretten onceki saniyelerdedir
 ISARET_ONCE, ISARET_SONRA = 25, 5
 ISARET_PUANI = 100.0    # isaretli sahne her zaman en ustte
+# Yorum genelde olaydan SONRA gelir ("abi gordun mu!"): olayi da kapsamak icin oncesinden pay birak
+YORUM_ONCE, YORUM_SONRA = 6, 1.5
+YORUM_PUAN_SINIR = 10.0  # sn basina 1 puan, en fazla bu kadar: surekli konusulsa da ses tepeleri ezilmesin
 
 
 def _birlestir(araliklar, bosluk=2.0):
@@ -30,8 +34,9 @@ def _birlestir(araliklar, bosluk=2.0):
     return bolunmus
 
 
-def adaylar(heyecan_dizisi, ses_dizisi, satirlar, sure_sn, isaretler=()):
+def adaylar(heyecan_dizisi, ses_dizisi, satirlar, sure_sn, isaretler=(), konusmalar=()):
     araliklar = [[max(0, m - ISARET_ONCE), min(sure_sn, m + ISARET_SONRA)] for m in isaretler]
+    araliklar += [[max(0, b - YORUM_ONCE), min(sure_sn, s + YORUM_SONRA)] for b, s in konusmalar]
     if len(heyecan_dizisi):
         tepeler = np.where((heyecan_dizisi >= HEYECAN_ESIK) & (ses_dizisi > -35))[0]
         grup = []
@@ -63,14 +68,20 @@ def adaylar(heyecan_dizisi, ses_dizisi, satirlar, sure_sn, isaretler=()):
         tepe = float(heyecan_dizisi[i:j].max()) if len(heyecan_dizisi[i:j]) else 0.0
         diyalog = [s for s in satirlar if s.bas < son and s.son > bas]
         isaretli = any(bas <= m <= son for m in isaretler)
+        yorum = [[round(max(b, bas) - bas, 1), round(min(s, son) - bas, 1)] for b, s in konusmalar
+                 if b < son and s > bas]
+        yorum_sn = sum(s - b for b, s in yorum)
         a = {
             "bas": round(bas, 1), "son": round(son, 1),
             "heyecan": round(tepe, 1),
             "diyalog": [{"t": round(s.bas - bas, 1), "en": s.en, "tr": s.tr} for s in diyalog],
-            "puan": tepe + 1.5 * len(diyalog) + (ISARET_PUANI if isaretli else 0),
+            "puan": tepe + 1.5 * len(diyalog) + (ISARET_PUANI if isaretli else 0)
+                    + min(YORUM_PUAN_SINIR, yorum_sn),
         }
         if isaretli:
             a["isaretli"] = True
+        if yorum:
+            a["yorum"] = yorum
         sonuc.append(a)
     if len(sonuc) > EN_FAZLA_ADAY:
         sonuc = sorted(sorted(sonuc, key=lambda a: -a["puan"])[:EN_FAZLA_ADAY], key=lambda a: a["bas"])

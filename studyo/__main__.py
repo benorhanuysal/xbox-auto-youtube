@@ -205,10 +205,15 @@ def main():
     _yaz("2/5 Ses analizi (heyecanli anlar)...")
     ses_dizisi = ses.egri(yol, sure)
     heyecan = ses.heyecan(ses_dizisi)
+    mikrofon = ses.mikrofon_egri(yol, sure)
+    konusmalar = ses.konusmalar(mikrofon)
+    if len(mikrofon):
+        _yaz("  Mikrofon: %d konusma, toplam %.0f sn" % (len(konusmalar), sum(s - b for b, s in konusmalar)))
 
     isaretler = isaret.kayittakiler(bas, sure)
-    adaylar = aday.adaylar(heyecan, ses_dizisi, satirlar, sure, isaretler)
-    _yaz("3/5 Aday sahne: %d (isaretli an: %d), kurgu plani hazirlaniyor..." % (len(adaylar), len(isaretler)))
+    adaylar = aday.adaylar(heyecan, ses_dizisi, satirlar, sure, isaretler, konusmalar)
+    _yaz("3/5 Aday sahne: %d (isaretli an: %d, yorumlu: %d), kurgu plani hazirlaniyor..." % (
+        len(adaylar), len(isaretler), sum(1 for a in adaylar if a.get("yorum"))))
     planlayicilar = None if not arg.planlayici else ([] if arg.planlayici == "yok" else [arg.planlayici])
     eski_plan = os.path.join(cikti, "plan.json")
     if arg.plani_kullan and os.path.exists(eski_plan):

@@ -215,12 +215,58 @@ def listeye_ekle(video_id, liste_id, servis=None):
     return True
 
 
+# ---------------------------------------------------------------- kanal "Hakkinda" metni
+HAKKINDA = os.path.join(KOK, "kanal_hakkinda.txt")
+HAKKINDA_YEDEK = os.path.join(KOK, "kanal_hakkinda.yedek.txt")
+HAKKINDA_SINIR = 1000
+
+
+def kanal_hakkinda(metin=None, servis=None):
+    """metin None ise mevcut metni dondurur; verilirse kanala yazar (once eskisini yedekler).
+    brandingSettings.update eksik alanlari SILER: once tamami okunur, yalniz aciklama degistirilir."""
+    servis = servis or _servis(KAPSAM_TAM)
+    k = servis.channels().list(part="brandingSettings", mine=True).execute()["items"][0]
+    bs = k.setdefault("brandingSettings", {})
+    eski = bs.get("channel", {}).get("description", "")
+    if metin is None:
+        return eski
+    if len(metin) > HAKKINDA_SINIR or "<" in metin or ">" in metin:
+        raise ValueError("Hakkinda metni en fazla %d karakter olmali ve < > icermemeli" % HAKKINDA_SINIR)
+    with open(HAKKINDA_YEDEK, "w", encoding="utf-8") as f:
+        f.write(eski)
+    bs.setdefault("channel", {})["description"] = metin
+    servis.channels().update(part="brandingSettings", body={"id": k["id"], "brandingSettings": bs}).execute()
+    return kanal_hakkinda(servis=servis)
+
+
+def _hakkinda_komutu():
+    with open(HAKKINDA, encoding="utf-8") as f:
+        yeni = f.read().strip()
+    servis = _servis(KAPSAM_TAM)
+    eski = kanal_hakkinda(servis=servis)
+    if eski.strip() == yeni:
+        print("[OK] Kanal Hakkinda metni zaten guncel.")
+        return
+    print("---- YENI METIN (%d/%d karakter) ----\n%s\n-------------------------------------" % (
+        len(yeni), HAKKINDA_SINIR, yeni))
+    if input("Kanala yazilsin mi? (e/h): ").strip().lower() not in ("e", "evet", "y"):
+        print("Vazgecildi, kanal degismedi.")
+        return
+    son = kanal_hakkinda(yeni, servis)
+    print("[OK] Guncellendi." if son.strip() == yeni else "[!] Yazildi ama dogrulanamadi, Studio'dan bakin.")
+    print("     Eski metin yedegi: %s" % HAKKINDA_YEDEK)
+
+
 # ---------------------------------------------------------------- komut satiri
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="studyo.youtube", description="YouTube izni")
     ap.add_argument("--kur", action="store_true", help="tarayicida kanal hesabiyla izin ver (bir kez)")
     ap.add_argument("--kontrol", action="store_true", help="izin gecerli mi, hangi kanal")
+    ap.add_argument("--hakkinda", action="store_true", help="kanal_hakkinda.txt'yi kanalin Hakkinda metni yap (onay sorar)")
     arg = ap.parse_args(argv)
+    if arg.hakkinda:
+        _hakkinda_komutu()
+        return
     if arg.kur:
         if os.path.exists(JETON):
             os.remove(JETON)  # baska kanal secilebilsin, yeni izinler istensin

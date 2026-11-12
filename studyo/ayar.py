@@ -72,6 +72,9 @@ VARSAYILAN = {
     # Ani isaretleme: klavye tusu (F1-F24) ve kumandada iki analog cubuga birlikte basma
     "isaret_tusu": "F9",
     "kumanda_isaret": True,
+    # Mikrofon (Windows varsayilan kayit aygiti) kayda girsin: yorum videoya ozgun deger katar,
+    # kurgu konustugun anlari ayri ses kanalindan bulup one cikarir
+    "mikrofon_kaydi": True,
     "obs_exe": r"C:\Program Files\obs-studio\bin\64bit\obs64.exe",
 }
 

@@ -66,7 +66,8 @@ def sahne_isle(kaynak, bas, son, cikti, bicim, satirlar, baslik=None, altyazi_go
         goruntu += ",subtitles=%s" % ass_ad  # goreli ad: Windows yolundaki ':' kacis derdi yok
     goruntu += ",fade=t=in:st=0:d=%.2f,fade=t=out:st=%.2f:d=%.2f[v]" % (GECIS, max(0, sure - GECIS), GECIS)
     # Ses kanali yoksa sessizlik uret (birlestirmede tum parcalarda ses olmali)
-    ses_girdisi = "[0:a]" if ses_var(kaynak) else "anullsrc=r=48000:cl=stereo,atrim=0:%.3f," % sure
+    # 1. ses kanali = oyun + mikrofon karisimi (2. kanal yalniz mikrofon, analiz icin)
+    ses_girdisi = "[0:a:0]" if ses_var(kaynak) else "anullsrc=r=48000:cl=stereo,atrim=0:%.3f," % sure
     ses = ses_girdisi + "aresample=48000,afade=t=in:st=0:d=%.2f,afade=t=out:st=%.2f:d=%.2f[a]" % (
         GECIS, max(0, sure - GECIS), GECIS)
 

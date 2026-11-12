@@ -258,7 +258,7 @@ class Bekci:
                 return
         if obs.kayitta_mi(cl):
             return  # kullanici zaten kaydediyor
-        self.onceki = obs.kayda_hazirla(cl)
+        self.onceki = obs.kayda_hazirla(cl, self.ayar.get("mikrofon_kaydi", True))
         cl.start_record()
         self.oto, self.kayitta, self.xbox_kaydi = True, True, True
         log.info("kayit basladi (otomatik)")

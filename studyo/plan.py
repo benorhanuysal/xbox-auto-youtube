@@ -16,6 +16,9 @@ and diyalog (subtitles inside the scene: t = seconds from scene start, en = Engl
 Scenes with "isaretli": true were marked by the player with a "this was great" button pressed right after the
 moment happened, so the highlight is in the last ~25 seconds of that scene. Always put every marked scene in
 "uzun" and use the marked moments first when choosing Shorts.
+"yorum" lists when the channel owner talks on the microphone inside the scene ([start, end] seconds from scene
+start): live Turkish voice commentary and reactions. This commentary is what makes the channel original rather
+than reused game footage, so prefer scenes with commentary, and never cut a commentary range in half.
 {kareler}
 Make an editing plan:
 1. "uzun": a {dk_min}-{dk_max} minute YouTube video. Pick the scenes that tell the session's story and the best
@@ -223,7 +226,7 @@ def _komut(adaylar, ayar, kare_idleri, ozetler=()):
         serbest_ornek=', {"bas": 412, "son": 436, "bolum": "..."}' if ozetler else "",
         ogrenme=_ogrenme_metni(),
         son_basliklar=_son_basliklar(),
-        adaylar=json.dumps([{k: a[k] for k in ("id", "bas", "son", "heyecan", "diyalog", "isaretli") if k in a}
+        adaylar=json.dumps([{k: a[k] for k in ("id", "bas", "son", "heyecan", "diyalog", "isaretli", "yorum") if k in a}
                             for a in adaylar], ensure_ascii=False),
     )
 

@@ -77,7 +77,19 @@ Kurulum (bir kez): `python -m studyo.izle --kur` — OBS'in uzaktan kumandasın�
 
 > Not: Uzaktan oynatmanın tam ekran penceresi Windows'un pencere listesinde görünmediği için OBS pencere yakalama siyah kaydeder; sahne bu yüzden **ekran yakalama** kullanır. Oynarken PC'de başka pencere açarsan o da kayda girer. Uzaktan oynatmayı bitirirken oyunu kapatmak yetmez: sol üstteki ⋮ → **Bağlantıyı kes**.
 
-Ayarlar (`ayarlar.json`): `oto_kayit`, `oto_kurgu`, `oto_kayit_basla_sn` (15), `oto_kayit_dur_sn` (60), `en_kisa_kayit_dk` (3), `isaret_tusu` (`"F9"`), `kumanda_isaret`, `obs_exe`.
+Ayarlar (`ayarlar.json`): `oto_kayit`, `oto_kurgu`, `oto_kayit_basla_sn` (15), `oto_kayit_dur_sn` (60), `en_kisa_kayit_dk` (3), `isaret_tusu` (`"F9"`), `kumanda_isaret`, `mikrofon_kaydi`, `obs_exe`.
+
+> OBS düzgün kapanmazsa (PC kapandı, işlem sonlandırıldı) bir sonraki açılışta "Güvenli modda başlat?" sorar; Güvenli Mod'da WebSocket çalışmaz ve otomatik kayıt başlayamaz. Bekçi OBS'i açmadan önce eski çalışma izlerini (`%APPDATA%\obs-studio\.sentinel\run_*`) siler, soru çıkmaz.
+
+### Mikrofon (yorum)
+Mikrofon **PC'ye** takılı olmalı (USB mikrofon; kulaklık Xbox kumandasına takılıysa ses Xbox'a gider, PC duymaz). Windows'ta varsayılan kayıt aygıtı yapılır; takınca Windows varsayılan **çıkışı** da mikrofona çevirebilir, *Ses ayarları → Çıkış*'ın TV'de kaldığını kontrol et. Otomatik kayıt sahnesine **"Mikrofon"** kaynağı (RNNoise gürültü bastırma ile) eklenir ve kayıt 2 ses kanallı olur:
+
+| Kanal | İçerik | Ne için |
+|---|---|---|
+| 1 | Xbox sesi + mikrofon | Videoya giren ses |
+| 2 | Yalnız mikrofon | Kurgu konuştuğun anları buradan bulur |
+
+Konuştuğun anlar aday sahne olur ve öne çıkar, Claude yorumu ortadan kesmez. Yorum YouTube'un "tekrar kullanılan içerik" kuralına karşı kanalın en güçlü özgünlük kanıtıdır. Kapatmak için `"mikrofon_kaydi": false`.
 
 Belirli bir kayıt için: `YAP.bat "D:\Kayitlar\2026-11-12 21-30-05.mkv"`. Sadece planı görmek için: `YAP.bat --sadece-plan`. Tek bir planlayıcı için: `YAP.bat --planlayici gemini` (`claude` / `gemini` / `yok`).
 
@@ -92,7 +104,7 @@ Kurulum (bir kez, ~5 dk):
 5. `python -m studyo.youtube --kur` → tarayıcıda **kanalın olduğu hesabı** (marka hesabıysa onu) seç, izin ver. Komut hangi kanala bağlandığını yazar.
 6. `ayarlar.json`: `"youtube_yukle": true`. İstersen `"youtube_gizlilik"`: `"private"` (varsayılan) / `"unlisted"` / `"public"`.
 
-İzin geçerli mi: `python -m studyo.youtube --kontrol`. Özel kapak için kanalın telefonla doğrulanmış olması gerekir ([youtube.com/verify](https://www.youtube.com/verify)); değilse video kapaksız yüklenir.
+İzin geçerli mi: `python -m studyo.youtube --kontrol`. Kanalın **Hakkında** metni `kanal_hakkinda.txt`'de durur; değiştirip `python -m studyo.youtube --hakkinda` çalıştırınca önizleme gösterir, onay verirsen kanala yazar (eski metin `kanal_hakkinda.yedek.txt`'ye yedeklenir). Özel kapak için kanalın telefonla doğrulanmış olması gerekir ([youtube.com/verify](https://www.youtube.com/verify)); değilse video kapaksız yüklenir.
 
 ### Her yüklemede otomatik
 | Ne | Nasıl | Ayar |
