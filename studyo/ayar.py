@@ -35,9 +35,11 @@ VARSAYILAN = {
     "altyazi_gom": True,
     # Videoya girecek altyazilari Claude ile kisalt/duzelt (okuma hizina sigsin, OCR hatalari gitsin)
     "altyazi_duzelt": True,
-    # YouTube API ile yukleme. Google denetiminden gecmemis projelerde videolar KALICI olarak gizli kalir;
-    # denetim onayi gelmeden acmayin, videolari Studio'dan yukleyin.
+    # YouTube API ile otomatik yukleme (kurulum: python -m studyo.youtube --kur). 2 Kasim 2026'dan beri
+    # denetimsiz projelerin videolari gizliye kilitlenmiyor.
     "youtube_yukle": False,
+    # private: gizli yuklenir, Studio'da kontrol edip sen yayinlarsin | unlisted: liste disi | public: hemen yayinda
+    "youtube_gizlilik": "private",
     "cikti_klasoru": "cikti",
     # ---- Bekci (python -m studyo.izle / IZLE.pyw)
     # Xbox uzaktan oynatma baslayinca OBS kaydini baslat, kapaninca durdur

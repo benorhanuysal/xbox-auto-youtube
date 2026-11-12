@@ -81,11 +81,18 @@ Ayarlar (`ayarlar.json`): `oto_kayit`, `oto_kurgu`, `oto_kayit_basla_sn` (15), `
 
 Belirli bir kayıt için: `YAP.bat "D:\Kayitlar\2026-11-12 21-30-05.mkv"`. Sadece planı görmek için: `YAP.bat --sadece-plan`. Tek bir planlayıcı için: `YAP.bat --planlayici gemini` (`claude` / `gemini` / `yok`).
 
-## Neden otomatik yükleme kapalı?
-YouTube API ile yükleme kodu hazır (`studyo/youtube.py`), ama Google'ın **API denetiminden** (audit) geçmemiş projelerden yüklenen videolar **kalıcı olarak gizli** kalıyor ve itiraz edilemiyor. Bu yüzden `"youtube_yukle": false` varsayılan; Studio'dan yüklemek 1 dakika sürer. Denetim onayı alırsan:
-1. Google Cloud'da proje → **YouTube Data API v3**'ü etkinleştir → OAuth izin ekranı → OAuth istemcisi (*Masaüstü uygulaması*).
-2. JSON'u bu klasöre `client_secret.json` olarak koy, `ayarlar.json`'da `"youtube_yukle": true`.
-3. İlk çalışmada tarayıcıda kanal hesabınla izin ver. Videolar **gizli** yüklenir; kontrol edip sen yayınlarsın.
+## YouTube'a otomatik yükleme
+Kurgu bitince uzun video ve Shorts'lar başlık, açıklama, etiket ve (uzun videoda) kapakla **gizli** yüklenir; Studio'da kontrol edip tek tıkla yayınlarsın. Linkler `cikti/<kayit>/youtube_linkleri.txt`'ye yazılır, Windows bildirimi gelir. 2 Kasım 2026'dan beri Google'ın denetiminden (audit) geçmemiş API projelerinin videoları artık gizliye kilitlenmiyor ([revision history](https://developers.google.com/youtube/v3/revision_history)); yükleme kotası ayrı: günde 100 video.
+
+Kurulum (bir kez, ~5 dk):
+1. [Google Cloud Console](https://console.cloud.google.com/) → yeni proje.
+2. **APIs & Services → Library → YouTube Data API v3 → Enable**.
+3. **Google Auth Platform** (OAuth izin ekranı) → *Get started*: uygulama adı, e-posta, **External**. Sonra **Audience → Publish app** (*In production*). *Testing*'de kalırsa izin 7 günde bir sona erer. Giriş ekranında "Google bu uygulamayı doğrulamadı" uyarısı normaldir (kendi uygulaman): *Gelişmiş → devam et*.
+4. **Clients → Create client → Desktop app** → JSON'u indir → bu klasöre `client_secret.json` adıyla koy.
+5. `python -m studyo.youtube --kur` → tarayıcıda **kanalın olduğu hesabı** (marka hesabıysa onu) seç, izin ver. Komut hangi kanala bağlandığını yazar.
+6. `ayarlar.json`: `"youtube_yukle": true`. İstersen `"youtube_gizlilik"`: `"private"` (varsayılan) / `"unlisted"` / `"public"`.
+
+İzin geçerli mi: `python -m studyo.youtube --kontrol`. Özel kapak için kanalın telefonla doğrulanmış olması gerekir ([youtube.com/verify](https://www.youtube.com/verify)); değilse video kapaksız yüklenir.
 
 ## Gizlilik
 `ayarlar.json`, `client_secret.json`, `token.json`, kayıtlar ve `cikti/` git'e girmez (`.gitignore`). Yapay zekâya yalnızca diyalog metni, sahne zamanları ve (Claude'da) sahne kareleri gider; kaydın tamamı gönderilmez.

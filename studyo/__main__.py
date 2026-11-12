@@ -24,6 +24,39 @@ def _aciklama(meta, ayar):
     return (meta.get("aciklama") or "").strip() + alt
 
 
+def _youtube_yukle(videolar, ayar, cikti):
+    """Her videoyu ayri dene: biri basarisiz olursa digerleri yine yuklensin. Linkler youtube_linkleri.txt'ye."""
+    from . import youtube
+    from .izle import bildirim
+    gizlilik = ayar["youtube_gizlilik"]
+    _yaz("6/6 YouTube'a yukleme (%s)" % gizlilik)
+    linkler, hatalar = [], []
+    for etiket, dosya, meta in videolar:
+        baslik = meta["baslik"] + (" #Shorts" if etiket.startswith("SHORTS") else "")
+        kapak = os.path.join(cikti, "uzun_kapak.jpg") if etiket == "UZUN VIDEO" else None
+        _yaz("  %s: %s" % (etiket, baslik))
+        try:
+            link = youtube.yukle(dosya, baslik, _aciklama(meta, ayar), meta["etiketler"], gizlilik, kapak, _yaz)
+        except youtube.GirisGerekli as e:
+            hatalar.append(str(e))
+            break  # diger videolar da ayni sebeple yuklenemez
+        except Exception as e:
+            hatalar.append("%s: %s" % (etiket, str(e)[:200]))
+            continue
+        _yaz("    " + link)
+        linkler.append("%s: %s\n  %s" % (etiket, baslik, link))
+    if linkler:
+        with open(os.path.join(cikti, "youtube_linkleri.txt"), "w", encoding="utf-8") as f:
+            f.write("\n".join(linkler) + "\n\nStudio: https://studio.youtube.com\n")
+    for h in hatalar:
+        _yaz("  [HATA] " + h)
+    if linkler:
+        bildirim("YouTube'a yuklendi", "%d video %s yuklendi. Studio'da kontrol edip yayinla." %
+                 (len(linkler), "gizli" if gizlilik == "private" else gizlilik))
+    if hatalar:
+        bildirim("YouTube yuklemesi basarisiz", hatalar[0][:150])
+
+
 def main():
     ap = argparse.ArgumentParser(prog="studyo", description="OBS kaydindan Turkce altyazili uzun video + Shorts")
     ap.add_argument("kayit", nargs="?", help="video dosyasi (bos: en yeni kayit)")
@@ -32,6 +65,8 @@ def main():
                     help="yalnizca bunu kullan (varsayilan: ayarlar.json sirasi)")
     ap.add_argument("--plani-kullan", action="store_true",
                     help="yapay zekaya sormadan cikti klasorundeki plan.json ile yeniden kurgula")
+    ap.add_argument("--sadece-yukle", action="store_true",
+                    help="kurgulamadan, cikti klasorundeki hazir videolari YouTube'a yukle")
     arg = ap.parse_args()
 
     ayar = ayar_modulu.yukle()
@@ -44,6 +79,14 @@ def main():
     ad = os.path.splitext(os.path.basename(yol))[0].replace(" ", "_")
     cikti = os.path.join(ayar["cikti_klasoru"], ad)
     os.makedirs(cikti, exist_ok=True)
+
+    if arg.sadece_yukle:
+        with open(os.path.join(cikti, "plan.json"), encoding="utf-8") as f:
+            plan = json.load(f)["plan"]
+        videolar = [("UZUN VIDEO", os.path.join(cikti, "uzun.mp4"), plan["uzun"])]
+        videolar += [("SHORTS %d" % i, os.path.join(cikti, "short_%d.mp4" % i), s) for i, s in enumerate(plan["shorts"], 1)]
+        _youtube_yukle([v for v in videolar if os.path.exists(v[1])], ayar, cikti)
+        return
 
     satirlar = altyazi.kayda_esle(ayar["luna_userconfig"], bas, sure, ayar["altyazi_gecikme_sn"])
     _yaz("1/5 Turkce altyazi: %d satir" % len(satirlar))
@@ -104,12 +147,8 @@ def main():
             baslik = meta["baslik"] + (" #Shorts" if etiket.startswith("SHORTS") else "")
             f.write("===== %s: %s =====\nBASLIK:\n%s\n\nACIKLAMA:\n%s\n\nETIKETLER:\n%s\n\n"
                     % (etiket, os.path.basename(dosya), baslik, _aciklama(meta, ayar), ", ".join(meta["etiketler"])))
-    if ayar["youtube_yukle"]:
-        from . import youtube
-        for etiket, dosya, meta in videolar:
-            baslik = meta["baslik"] + (" #Shorts" if etiket.startswith("SHORTS") else "")
-            _yaz("  %s yukleniyor (gizli)" % etiket)
-            _yaz("    " + youtube.yukle(dosya, baslik, _aciklama(meta, ayar), meta["etiketler"], _yaz))
+    if ayar["youtube_yukle"] and videolar:
+        _youtube_yukle(videolar, ayar, cikti)
 
     _yaz("Bitti (%.1f dk): %s" % ((time.time() - t0) / 60, cikti))
     if sys.platform == "win32":
