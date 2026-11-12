@@ -86,12 +86,30 @@ def gonder(metin, klavye=True):
         return False
 
 
+def yetkili_mi(m, sohbet):
+    """Yalniz sahibin bota OZEL sohbetten yazdigi mesaj: sohbet de gonderen de eslesen hesap olmali
+    (bot bir gruba eklense bile oradaki mesajlar, sahibinkiler dahil, gecmez)."""
+    c = m.get("chat") or {}
+    return c.get("type") == "private" and c.get("id") == sohbet and (m.get("from") or {}).get("id") == sohbet
+
+
+def _yabanci_uyarisi(m, son_uyari):
+    kimden = m.get("from") or {}
+    kim = "@" + kimden["username"] if kimden.get("username") else (kimden.get("first_name") or "biri")
+    anahtar = kimden.get("id") or kim
+    log.warning("telegram: yabanci hesap yok sayildi (%s)", kim)
+    if time.time() - son_uyari.get(anahtar, 0) > 3600:  # ayni kisi icin saatte bir
+        son_uyari[anahtar] = time.time()
+        gonder("⚠️ %s botuna yazmaya çalıştı; yok sayıldı. Bot yalnız sana cevap verir." % kim)
+
+
 def dinle(istekler, durdur):
     """Uzun sorgu. Eslesen sohbetin dugmeleri istekler kuyruguna (eylem, basilma_zamani) olarak girer."""
     a = oku()
     token, sohbet = a.get("token"), a.get("sohbet")
     if not (token and sohbet):
         return
+    son_uyari = {}
     ofset = None
     try:  # bekci kapaliyken basilmis eski dugmeler calismasin
         eski = _api(token, "getUpdates", {"timeout": 0})
@@ -115,8 +133,11 @@ def dinle(istekler, durdur):
         for g in guncellemeler:
             ofset = g["update_id"] + 1
             m = g.get("message") or {}
-            if (m.get("chat") or {}).get("id") != sohbet:
-                log.warning("telegram: eslesmemis sohbetten mesaj yok sayildi")
+            if not yetkili_mi(m, sohbet):
+                if (m.get("from") or {}).get("id") == sohbet:
+                    log.info("telegram: sahibin grup mesaji yok sayildi (komutlar yalniz ozel sohbetten)")
+                else:
+                    _yabanci_uyarisi(m, son_uyari)
                 continue
             tarih = m.get("date", time.time())
             if time.time() - tarih > ESKI_KOMUT_SN:
@@ -132,8 +153,15 @@ def _jeton_dosyadan(yol):
     return bulunan.group(0) if bulunan else ""
 
 
-def kur(dosya=None):
+def kur(dosya=None, sifirla=False):
     print("Telegram kumandasi kurulumu")
+    eski = oku()
+    if eski.get("sohbet") and not sifirla:
+        # Tekrar calistirmak eslesmeyi bota o sirada yazan BASKASINA gecirmesin
+        print("[OK] Zaten eslesmis: %s (@%s). Bot yalniz bu hesaba cevap veriyor." % (
+            eski.get("ad") or "sahip", eski.get("bot")))
+        print("     Baska hesap/bot icin: python -m studyo.telegram --kur --sifirla")
+        return 0
     if dosya:
         token = _jeton_dosyadan(dosya)
         print("  %s okundu: jeton %s" % (os.path.basename(dosya), "var" if token else "YOK"))
@@ -167,7 +195,8 @@ def kur(dosya=None):
         return 1
     if ofset is not None:
         _api(token, "getUpdates", {"offset": ofset, "timeout": 0})  # eslesme mesajini tuket
-    _yaz({"token": token, "sohbet": sohbet, "bot": bot.get("username"), "eslesme": datetime.datetime.now().isoformat(timespec="seconds")})
+    _yaz({"token": token, "sohbet": sohbet, "ad": ad, "bot": bot.get("username"),
+          "eslesme": datetime.datetime.now().isoformat(timespec="seconds")})
     gonder("✅ Merhaba %s! Kumanda hazır.\n\n%s" % (ad, YARDIM))
     print("[OK] Eslesti: %s. Bot artik yalniz bu sohbete cevap verir. Bekciyi yeniden baslatinca devreye girer." % (ad or sohbet))
     return 0
@@ -177,10 +206,11 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="studyo.telegram", description="Telegram uzaktan kumandasi")
     ap.add_argument("--kur", action="store_true", help="bot jetonu + sohbet eslestirme")
     ap.add_argument("--dosya", help="--kur ile: jetonu bu metin dosyasindan oku")
+    ap.add_argument("--sifirla", action="store_true", help="--kur ile: mevcut eslesmeyi silip yeniden esle")
     ap.add_argument("--dene", action="store_true", help="deneme mesaji")
     arg = ap.parse_args(argv)
     if arg.kur:
-        return kur(arg.dosya)
+        return kur(arg.dosya, arg.sifirla)
     if arg.dene:
         print("[OK] gonderildi" if gonder("Deneme mesajı 👋") else "[!] gonderilemedi (once --kur)")
         return 0
