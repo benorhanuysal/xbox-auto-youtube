@@ -3,6 +3,7 @@ ayarlar.json
 client_secret*.json
 token.json
 *key*.txt
+isaretler.txt
 
 # Ciktilar ve kayitlar
 cikti/

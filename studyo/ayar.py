@@ -28,14 +28,29 @@ VARSAYILAN = {
     "uzun_video_dk": [8, 15],
     "shorts_sayisi": 3,
     "shorts_en_uzun_sn": 58,
-    # Luna ceviriyi altyazi ekrana geldikten yaklasik bu kadar sonra yazar
-    "altyazi_gecikme_sn": 1.0,
+    # Luna ceviriyi altyazi ekrana geldikten yaklasik bu kadar sonra yazar (OCR + ceviri).
+    # Kayitta olculdu: Ingilizce satir ekrana geldikten 1,5-2 sn sonra gunlukte.
+    "altyazi_gecikme_sn": 2.0,
     # Turkce altyaziyi videonun uzerine yaz
     "altyazi_gom": True,
     # YouTube API ile yukleme. Google denetiminden gecmemis projelerde videolar KALICI olarak gizli kalir;
     # denetim onayi gelmeden acmayin, videolari Studio'dan yukleyin.
     "youtube_yukle": False,
     "cikti_klasoru": "cikti",
+    # ---- Bekci (python -m studyo.izle / IZLE.pyw)
+    # Xbox uzaktan oynatma baslayinca OBS kaydini baslat, kapaninca durdur
+    "oto_kayit": True,
+    # Xbox sahnesindeki kayit durunca kurguyu kendiliginden baslat
+    "oto_kurgu": True,
+    # Uzaktan oynatma sesi bu kadar sn kesintisiz akinca kayit baslar; bu kadar sn kesilince durur
+    "oto_kayit_basla_sn": 15,
+    "oto_kayit_dur_sn": 60,
+    # Bundan kisa kayitlar kurgulanmaz (yanlislikla acilan uzaktan oynatma vb.)
+    "en_kisa_kayit_dk": 3,
+    # Ani isaretleme: klavye tusu (F1-F24) ve kumandada iki analog cubuga birlikte basma
+    "isaret_tusu": "F9",
+    "kumanda_isaret": True,
+    "obs_exe": r"C:\Program Files\obs-studio\bin\64bit\obs64.exe",
 }
 
 

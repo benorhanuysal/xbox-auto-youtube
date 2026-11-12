@@ -11,7 +11,7 @@ import os
 import sys
 import time
 
-from . import aday, altyazi, ayar as ayar_modulu, kayit, kurgu, plan as plan_modulu, ses
+from . import aday, altyazi, ayar as ayar_modulu, isaret, kayit, kurgu, plan as plan_modulu, ses
 
 
 def _yaz(metin):
@@ -52,8 +52,9 @@ def main():
     ses_dizisi = ses.egri(yol, sure)
     heyecan = ses.heyecan(ses_dizisi)
 
-    adaylar = aday.adaylar(heyecan, ses_dizisi, satirlar, sure)
-    _yaz("3/5 Aday sahne: %d, kurgu plani hazirlaniyor..." % len(adaylar))
+    isaretler = isaret.kayittakiler(bas, sure)
+    adaylar = aday.adaylar(heyecan, ses_dizisi, satirlar, sure, isaretler)
+    _yaz("3/5 Aday sahne: %d (isaretli an: %d), kurgu plani hazirlaniyor..." % (len(adaylar), len(isaretler)))
     planlayicilar = None if not arg.planlayici else ([] if arg.planlayici == "yok" else [arg.planlayici])
     plan = plan_modulu.plan(adaylar, ayar, yol, cikti, _yaz, planlayicilar)
     with open(os.path.join(cikti, "plan.json"), "w", encoding="utf-8") as f:

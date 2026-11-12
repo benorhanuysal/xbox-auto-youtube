@@ -13,6 +13,9 @@ The channel posts gameplay with live AI-translated Turkish subtitles: story miss
 Below are candidate scenes from one recording session. Each has: id, bas/son (seconds in the recording),
 heyecan (how much louder than usual the audio gets, in loudness units: gunfights, crashes, explosions, shouting),
 and diyalog (subtitles inside the scene: t = seconds from scene start, en = English, tr = Turkish).
+Scenes with "isaretli": true were marked by the player with a "this was great" button pressed right after the
+moment happened, so the highlight is in the last ~25 seconds of that scene. Always put every marked scene in
+"uzun" and use the marked moments first when choosing Shorts.
 {kareler}
 Make an editing plan:
 1. "uzun": a {dk_min}-{dk_max} minute YouTube video. Pick the scenes that tell the session's story and the best
@@ -97,8 +100,8 @@ def _komut(adaylar, ayar, kare_idleri):
         kanal=ayar["kanal"], oyun=ayar["oyun"], dk_min=ayar["uzun_video_dk"][0], dk_max=ayar["uzun_video_dk"][1],
         shorts=ayar["shorts_sayisi"], short_sn=ayar["shorts_en_uzun_sn"],
         kareler=_KARE_BOLUMU.format(idler=", ".join(map(str, kare_idleri))) if kare_idleri else "",
-        adaylar=json.dumps([{k: a[k] for k in ("id", "bas", "son", "heyecan", "diyalog")} for a in adaylar],
-                           ensure_ascii=False),
+        adaylar=json.dumps([{k: a[k] for k in ("id", "bas", "son", "heyecan", "diyalog", "isaretli") if k in a}
+                            for a in adaylar], ensure_ascii=False),
     )
 
 
@@ -146,6 +149,13 @@ def plan(adaylar, ayar, kayit_yolu, cikti_klasoru, gunluk=print, planlayicilar=N
         },
         "shorts": [],
     }
+    # Isaretli sahne plana girmediyse (yapay zeka atladiysa) yine de uzun videoya ekle
+    parcalar = sonuc["uzun"]["parcalar"]
+    for a in adaylar:
+        if a.get("isaretli") and not any(b < a["son"] and s > a["bas"] for b, s in parcalar):
+            gunluk("  Isaretli sahne plana eklendi: %.0f-%.0f sn" % (a["bas"], a["son"]))
+            parcalar.append([a["bas"], a["son"]])
+    parcalar.sort()
     for s in (ham.get("shorts") or [])[: ayar["shorts_sayisi"]]:
         parcalar = _parcalari_dogrula(s.get("parcalar"), adaylar_sozluk, ayar["shorts_en_uzun_sn"])
         if parcalar:

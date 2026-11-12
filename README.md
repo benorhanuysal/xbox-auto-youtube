@@ -66,6 +66,19 @@ OBS kaydı (.mkv) ──┬─> ses analizi: çevresinden belirgin yüksek anlar
    - `plan.json`: Gemini'nin seçtiği sahneler (merak edersen)
 3. [YouTube Studio](https://studio.youtube.com) → **Oluştur → Video yükle** → dosyayı sürükle, `yukleme_bilgisi.txt`'den başlık ve açıklamayı yapıştır, kapak olarak `uzun_kapak.jpg`'yi seç.
 
+## Otomatik mod (önerilen): sadece oyna
+Arka planda çalışan bekçi (`studyo/izle.py`) her şeyi kendisi yapar:
+
+- **Otomatik kayıt:** Xbox uzaktan oynatma başlayınca (Xbox uygulamasının sesi akmaya başlayınca) OBS'i simge durumunda açar, **"Xbox (otomatik)"** sahnesine geçer ve kaydı başlatır; uzaktan oynatma kapanınca (1 dk sessizlik) durdurur. Kayıt sırasında masaüstü sesi kapatılır, yalnızca Xbox sesi kaydedilir; bitince önceki sahne ve ses ayarı geri gelir.
+- **Otomatik kurgu:** Xbox sahnesindeki kayıt durunca (otomatik ya da elle) kurgu başlar; bitince Windows bildirimi gelir ve çıktı klasörü açılır. 3 dakikadan kısa kayıtlar atlanır.
+- **Anı işaretle:** Oynarken güzel bir an olunca hemen ardından klavyede **F9**'a bas (PC'den iki kısa bip). O anın son ~25 saniyesi uzun videoya mutlaka girer, Shorts için de önce o anlara bakılır. Kumanda PC'ye bağlıysa **iki analog çubuğa birlikte basmak** da işaretler (kumanda Xbox'a bağlıysa PC onu göremez).
+
+Kurulum (bir kez): `python -m studyo.izle --kur` — OBS'in uzaktan kumandasını (WebSocket) açar ve bekçiyi Windows açılışına ekler (OBS kapalıyken çalıştırın). Bekçiyi pencerede izlemek için `IZLE.bat`, açılıştan çıkarmak için `python -m studyo.izle --kaldir`. Günlük: `izle.log`, kurgu çıktısı: `izle_kurgu.log`.
+
+> Not: Uzaktan oynatmanın tam ekran penceresi Windows'un pencere listesinde görünmediği için OBS pencere yakalama siyah kaydeder; sahne bu yüzden **ekran yakalama** kullanır. Oynarken PC'de başka pencere açarsan o da kayda girer. Uzaktan oynatmayı bitirirken oyunu kapatmak yetmez: sol üstteki ⋮ → **Bağlantıyı kes**.
+
+Ayarlar (`ayarlar.json`): `oto_kayit`, `oto_kurgu`, `oto_kayit_basla_sn` (15), `oto_kayit_dur_sn` (60), `en_kisa_kayit_dk` (3), `isaret_tusu` (`"F9"`), `kumanda_isaret`, `obs_exe`.
+
 Belirli bir kayıt için: `YAP.bat "D:\Kayitlar\2026-11-12 21-30-05.mkv"`. Sadece planı görmek için: `YAP.bat --sadece-plan`. Tek bir planlayıcı için: `YAP.bat --planlayici gemini` (`claude` / `gemini` / `yok`).
 
 ## Neden otomatik yükleme kapalı?

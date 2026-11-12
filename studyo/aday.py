@@ -6,6 +6,9 @@ TEPE_ONCE, TEPE_SONRA = 8, 5
 DIYALOG_ARA = 5.0       # sn: bundan kisa aralikla gelen altyazilar ayni sahne
 EN_UZUN = 90.0
 EN_FAZLA_ADAY = 60
+# Isaret tusuna olaydan SONRA basilir: aksiyon isaretten onceki saniyelerdedir
+ISARET_ONCE, ISARET_SONRA = 25, 5
+ISARET_PUANI = 100.0    # isaretli sahne her zaman en ustte
 
 
 def _birlestir(araliklar, bosluk=2.0):
@@ -27,8 +30,8 @@ def _birlestir(araliklar, bosluk=2.0):
     return bolunmus
 
 
-def adaylar(heyecan_dizisi, ses_dizisi, satirlar, sure_sn):
-    araliklar = []
+def adaylar(heyecan_dizisi, ses_dizisi, satirlar, sure_sn, isaretler=()):
+    araliklar = [[max(0, m - ISARET_ONCE), min(sure_sn, m + ISARET_SONRA)] for m in isaretler]
     if len(heyecan_dizisi):
         tepeler = np.where((heyecan_dizisi >= HEYECAN_ESIK) & (ses_dizisi > -35))[0]
         grup = []
@@ -59,12 +62,16 @@ def adaylar(heyecan_dizisi, ses_dizisi, satirlar, sure_sn):
         i, j = int(bas), int(son) + 1
         tepe = float(heyecan_dizisi[i:j].max()) if len(heyecan_dizisi[i:j]) else 0.0
         diyalog = [s for s in satirlar if s.bas < son and s.son > bas]
-        sonuc.append({
+        isaretli = any(bas <= m <= son for m in isaretler)
+        a = {
             "bas": round(bas, 1), "son": round(son, 1),
             "heyecan": round(tepe, 1),
             "diyalog": [{"t": round(s.bas - bas, 1), "en": s.en, "tr": s.tr} for s in diyalog],
-            "puan": tepe + 1.5 * len(diyalog),
-        })
+            "puan": tepe + 1.5 * len(diyalog) + (ISARET_PUANI if isaretli else 0),
+        }
+        if isaretli:
+            a["isaretli"] = True
+        sonuc.append(a)
     if len(sonuc) > EN_FAZLA_ADAY:
         sonuc = sorted(sorted(sonuc, key=lambda a: -a["puan"])[:EN_FAZLA_ADAY], key=lambda a: a["bas"])
     for i, a in enumerate(sonuc, 1):
