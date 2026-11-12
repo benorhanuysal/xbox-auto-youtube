@@ -1,0 +1,16 @@
+# Kisisel
+ayarlar.json
+client_secret*.json
+token.json
+*key*.txt
+
+# Ciktilar ve kayitlar
+cikti/
+*.mkv
+*.mp4
+*.mov
+*.flv
+*.log
+
+__pycache__/
+*.pyc
