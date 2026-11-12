@@ -48,5 +48,5 @@ def iste(metin, klasor, model=None, gunluk=print):
     except ValueError as e:
         gunluk("  Claude plani JSON degil: %s" % e)
         return None
-    gunluk("  Claude plani hazir (%.0f sn)" % (cikti.get("duration_ms", 0) / 1000))
+    gunluk("  Claude cevabi hazir (%.0f sn)" % (cikti.get("duration_ms", 0) / 1000))
     return ham

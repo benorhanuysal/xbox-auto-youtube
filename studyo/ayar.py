@@ -33,6 +33,8 @@ VARSAYILAN = {
     "altyazi_gecikme_sn": 2.0,
     # Turkce altyaziyi videonun uzerine yaz
     "altyazi_gom": True,
+    # Videoya girecek altyazilari Claude ile kisalt/duzelt (okuma hizina sigsin, OCR hatalari gitsin)
+    "altyazi_duzelt": True,
     # YouTube API ile yukleme. Google denetiminden gecmemis projelerde videolar KALICI olarak gizli kalir;
     # denetim onayi gelmeden acmayin, videolari Studio'dan yukleyin.
     "youtube_yukle": False,

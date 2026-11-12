@@ -11,7 +11,7 @@ import os
 import sys
 import time
 
-from . import aday, altyazi, ayar as ayar_modulu, isaret, kayit, kurgu, plan as plan_modulu, ses
+from . import aday, altyazi, altyazi_duzelt, ayar as ayar_modulu, isaret, kayit, kurgu, plan as plan_modulu, ses
 
 
 def _yaz(metin):
@@ -72,6 +72,13 @@ def main():
     if arg.sadece_plan:
         _yaz("Plan: %s" % os.path.join(cikti, "plan.json"))
         return
+
+    if ayar["altyazi_gom"] and ayar["altyazi_duzelt"] and satirlar:
+        # Yalnizca videoya girecek satirlar: canli ceviri uzun/harfiyen, izleyici okumaya yetismiyor
+        parcalar = list(plan["uzun"]["parcalar"]) + [p for s in plan["shorts"] for p in s["parcalar"]]
+        kullanilan = [s for s in satirlar if any(s.bas < son and s.son > bas for bas, son in parcalar)]
+        kalan = {id(s) for s in altyazi_duzelt.duzelt(kullanilan, ayar, cikti, _yaz)}
+        satirlar = [s for s in satirlar if id(s) in kalan or s not in kullanilan]
 
     ad_kod, _ = kurgu.kodlayici()
     _yaz("4/5 Kurgu (kodlayici: %s)" % ad_kod)
