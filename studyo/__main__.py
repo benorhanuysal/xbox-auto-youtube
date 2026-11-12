@@ -30,6 +30,8 @@ def main():
     ap.add_argument("--sadece-plan", action="store_true")
     ap.add_argument("--planlayici", choices=["claude", "gemini", "yok"],
                     help="yalnizca bunu kullan (varsayilan: ayarlar.json sirasi)")
+    ap.add_argument("--plani-kullan", action="store_true",
+                    help="yapay zekaya sormadan cikti klasorundeki plan.json ile yeniden kurgula")
     arg = ap.parse_args()
 
     ayar = ayar_modulu.yukle()
@@ -56,7 +58,13 @@ def main():
     adaylar = aday.adaylar(heyecan, ses_dizisi, satirlar, sure, isaretler)
     _yaz("3/5 Aday sahne: %d (isaretli an: %d), kurgu plani hazirlaniyor..." % (len(adaylar), len(isaretler)))
     planlayicilar = None if not arg.planlayici else ([] if arg.planlayici == "yok" else [arg.planlayici])
-    plan = plan_modulu.plan(adaylar, ayar, yol, cikti, _yaz, planlayicilar)
+    eski_plan = os.path.join(cikti, "plan.json")
+    if arg.plani_kullan and os.path.exists(eski_plan):
+        with open(eski_plan, encoding="utf-8") as f:
+            plan = json.load(f)["plan"]
+        _yaz("  Kayitli plan kullaniliyor: %s" % eski_plan)
+    else:
+        plan = plan_modulu.plan(adaylar, ayar, yol, cikti, _yaz, planlayicilar, sure)
     with open(os.path.join(cikti, "plan.json"), "w", encoding="utf-8") as f:
         json.dump({"kayit": yol, "adaylar": adaylar, "plan": plan}, f, ensure_ascii=False, indent=2)
     uzun_sn = sum(s - b for b, s in plan["uzun"]["parcalar"])

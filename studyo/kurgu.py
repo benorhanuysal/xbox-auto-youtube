@@ -1,14 +1,16 @@
 """ffmpeg ile kurgu: her sahne ayri islenir (olcek, Shorts icin dikey, altyazi gomme, yumusak gecis),
 sonra kayipsiz birlestirilir. Ekran karti kodlayicisi varsa (NVIDIA NVENC / Intel QSV) o kullanilir."""
 import os
+import re
 import subprocess
 
 from . import altyazi
 
 _KODLAYICILAR = [
-    ("h264_nvenc", ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "21", "-b:v", "0"]),
-    ("h264_qsv", ["-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "22"]),
-    ("libx264", ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21"]),
+    ("h264_nvenc", ["-c:v", "h264_nvenc", "-preset", "p6", "-tune", "hq", "-rc", "vbr", "-cq", "19", "-b:v", "0",
+                    "-spatial-aq", "1"]),
+    ("h264_qsv", ["-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "20"]),
+    ("libx264", ["-c:v", "libx264", "-preset", "medium", "-crf", "19"]),
 ]
 _secili = None
 GECIS = 0.35  # sn: sahne basinda/sonunda kararma
@@ -51,10 +53,9 @@ def sahne_isle(kaynak, bas, son, cikti, bicim, satirlar, baslik=None, altyazi_go
     klasor = os.path.dirname(os.path.abspath(cikti))
     sure = son - bas
     if bicim == "dikey":
-        # 9:16: arkada bulaniklastirilmis tam ekran, ortada oyunun kendisi
-        goruntu = ("[0:v]split[a][b];"
-                   "[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:2,eq=brightness=-0.12[arka];"
-                   "[b]scale=1080:-2[on];[arka][on]overlay=(W-w)/2:(H-h)/2,fps=60,setsar=1")
+        # 9:16 tam ekran: oyunun ortasindan (karakter genelde ortada) dikey kirp, buyutup hafif keskinlestir
+        goruntu = ("[0:v]crop=trunc(ih*9/16/2)*2:ih:(iw-ow)/2:0,scale=1080:1920:flags=lanczos,"
+                   "unsharp=5:5:0.5:5:5:0,fps=60,setsar=1")
     else:
         goruntu = ("[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,"
                    "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,fps=60,setsar=1")
@@ -108,12 +109,63 @@ def kare_seridi(kaynak, bas, son, cikti, genislik=400):
               os.path.dirname(os.path.abspath(cikti)))
 
 
+def ozet_sayfalari(kaynak, sure_sn, klasor, aralik=10, sutun=6, satir=8):
+    """Kaydin tamamindan her `aralik` saniyede bir kare; her sayfada sutun x satir kare, uzerinde saniyesi.
+    Yapay zeka ses/diyalogla bulunamayan anlari (dusme, kaza, komik fizik) buradan bulur.
+    Yalnizca anahtar kareler cozulur: saatlik kayit da hizli biter."""
+    os.makedirs(klasor, exist_ok=True)
+    for eski in os.listdir(klasor):
+        if eski.startswith("ozet_") and eski.endswith(".jpg"):
+            os.remove(os.path.join(klasor, eski))
+    yazi = ("drawtext=fontfile='C\\:/Windows/Fonts/arialbd.ttf':text='%{eif\\:t\\:d}':x=6:y=6:fontsize=26:"
+            "fontcolor=yellow:box=1:boxcolor=black@0.7")
+    _calistir(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-skip_frame", "nokey", "-i", os.path.abspath(kaynak),
+               "-vf", "fps=1/%d,scale=320:-2,%s,tile=%dx%d" % (aralik, yazi, sutun, satir), "-fps_mode", "vfr",
+               "-q:v", "4", "ozet_%d.jpg"], klasor)
+    return sorted((d for d in os.listdir(klasor) if d.startswith("ozet_") and d.endswith(".jpg")),
+                  key=lambda d: int(d[5:-4]))
+
+
+def _siyahlar(kaynak, bas, sure):
+    """[bas, bas+sure] icindeki siyah araliklar (kaynaga gore saniye)."""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-ss", "%.3f" % bas, "-t", "%.3f" % sure,
+                        "-i", os.path.abspath(kaynak), "-an", "-vf", "scale=480:-2,blackdetect=d=0.4:pix_th=0.08",
+                        "-f", "null", "-"], capture_output=True, text=True, errors="replace")
+    sonuc = []
+    for m in re.finditer(r"black_start:([\d.]+) black_end:([\d.]+)", r.stderr):
+        sonuc.append((bas + float(m.group(1)), bas + float(m.group(2))))
+    return sonuc
+
+
+def siyahi_kirp(kaynak, bas, son, bakis=8.0):
+    """Sahnenin basindaki/sonundaki siyah kismi (yukleme, olum ekrani kararmasi) at."""
+    try:
+        for b, s in _siyahlar(kaynak, bas, min(bakis, son - bas)):
+            if b <= bas + 0.2:
+                bas = max(bas, s)
+        if son - bas > 2:
+            ilk = max(bas, son - bakis)
+            for b, s in _siyahlar(kaynak, ilk, son - ilk):
+                if s >= son - 0.2:
+                    son = min(son, b + 0.3)
+    except OSError:
+        pass
+    return bas, son
+
+
 def video_yap(kaynak, parcalar, cikti, bicim, satirlar, baslik=None, altyazi_gom=True, gunluk=print):
     """parcalar: [[bas, son], ...] -> tek video."""
     klasor = os.path.dirname(os.path.abspath(cikti))
     ad = os.path.splitext(os.path.basename(cikti))[0]
     ara = []
     for i, (bas, son) in enumerate(parcalar, 1):
+        yeni = siyahi_kirp(kaynak, bas, son)
+        if yeni[1] - yeni[0] < 1.5:
+            gunluk("    sahne %d/%d atlandi (tamami siyah)" % (i, len(parcalar)))
+            continue
+        if (round(yeni[0], 1), round(yeni[1], 1)) != (round(bas, 1), round(son, 1)):
+            gunluk("    siyah kirpildi: %.1f-%.1f -> %.1f-%.1f" % (bas, son, yeni[0], yeni[1]))
+        bas, son = yeni
         gunluk("    sahne %d/%d (%.0f-%.0f sn)" % (i, len(parcalar), bas, son))
         p = os.path.join(klasor, "_%s_%03d.mp4" % (ad, i))
         sahne_isle(kaynak, bas, son, p, bicim, satirlar, baslik, altyazi_gom)
