@@ -77,6 +77,28 @@ def xbox_sesi_akiyor():
     return False
 
 
+def on_plan():
+    """Oyunu TV'nin Xbox HDMI girisinden oynarken PC ekranini kimse gormuyor ama OBS onu kaydedip yayinliyor.
+    Uzaktan oynatmanin onune baska pencere gecerse bilmek icin: 'exe | baslik' (olcum; koruma buna gore yazilacak)."""
+    u, k = ctypes.windll.user32, ctypes.windll.kernel32
+    h = u.GetForegroundWindow()
+    if not h:
+        return "(yok)"
+    pid = wt.DWORD()
+    u.GetWindowThreadProcessId(h, ctypes.byref(pid))
+    n = u.GetWindowTextLengthW(h)
+    baslik = ctypes.create_unicode_buffer(n + 1)
+    u.GetWindowTextW(h, baslik, n + 1)
+    exe = "?"
+    sp = k.OpenProcess(0x1000, False, pid.value)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if sp:
+        yol, boy = ctypes.create_unicode_buffer(260), wt.DWORD(260)
+        if k.QueryFullProcessImageNameW(sp, 0, yol, ctypes.byref(boy)):
+            exe = os.path.basename(yol.value)
+        k.CloseHandle(sp)
+    return "%s | %s" % (exe, baslik.value[:60])
+
+
 def luna_acik_mi():
     r = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True, errors="replace",
                        creationflags=_GIZLI)
@@ -285,6 +307,7 @@ class Bekci:
         self.ekran_gizli = False
         self.ertelenen = None     # yayin surerken kayit biterse sahne geri yuklemesi yayin sonuna kalir
         self.yayin_istendi = None # start_stream zamani: yayin bu surede baslamazsa haber ver
+        self.son_on_plan = None
 
     def _baglanti(self, bekle=0):
         if self.cl is not None:
@@ -537,6 +560,14 @@ class Bekci:
         self.kayitta = kayitta
         if cl is not None:
             self._yayin_turu(cl, simdi, oturum_bitti)
+        if kayitta or self.yayinda:
+            try:
+                pencere = on_plan()
+                if pencere != self.son_on_plan:
+                    log.info("on plandaki pencere: %s", pencere)
+                    self.son_on_plan = pencere
+            except Exception:
+                pass
 
         if not self.ayar["oto_kayit"]:
             return
