@@ -76,8 +76,8 @@ def adresleri_ayikla(metin):
 
 
 def hazirla(cl, ayar):
-    """Yayin OBS'inin sahnesini kur: ekran, Xbox sesi, mikrofon + altyazi, chat, bildirimler (hep acik)."""
-    obs.yayin_sahnesi(cl, web_adresleri(), ayar["yayin_chat_kutusu"])
+    """Yayin OBS'inin sahnesini kur: ekran, Xbox sesi, mikrofon + altyazi, chat, bildirimler (hep acik) + mola."""
+    obs.yayin_sahnesi(cl, web_adresleri(), ayar["yayin_chat_kutusu"], ayar.get("yayin_mola_gorseli"))
 
 
 def katmanlar_komutu(dosya):

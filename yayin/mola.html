@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- Yayin mola ekrani (OBS tarayici kaynagi, 1920x1080). Yayin sahnesinin EN ALTINDA durur: ekran yakalama
+     gorunurken tamamen ortulur; uzaktan oynatma kesilip ekran gizlenince (masaustu yayina cikmasin) bu gorunur.
+     Adres parametresi: ?gorsel=file:///.../banner_2560x1440.png (kanal gorseli; yoksa duz synthwave zemin). -->
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Mola</title>
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #12061f; }
+  #zemin { position: absolute; inset: 0; background: linear-gradient(#24104a, #e0386e 55%, #12061f 56%);
+           background-size: cover; background-position: center; }
+  /* Altyazi katmani alttan 215 px'te biter: mola yazisi onun altinda kalsin, cakismasin */
+  #kutu { position: absolute; left: 0; right: 0; bottom: 36px; text-align: center;
+          font-family: "Segoe UI", Arial, sans-serif; color: #fff; }
+  #baslik { font-size: 56px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase;
+            text-shadow: 0 0 18px #ff3fa4, 0 0 42px #ff3fa4; animation: nabiz 2.4s ease-in-out infinite; }
+  #alt { margin-top: 14px; font-size: 30px; font-weight: 600; color: #7ff3ff; letter-spacing: 2px;
+         text-shadow: 0 0 12px #00e5ff; }
+  #nokta::after { content: ""; animation: nokta 1.5s steps(4) infinite; }
+  @keyframes nabiz { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
+  @keyframes nokta { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+</style>
+</head>
+<body>
+<div id="zemin"></div>
+<div id="kutu">
+  <div id="baslik">Birazdan dönüyoruz<span id="nokta"></span></div>
+  <div id="alt">Kısa bir mola · chat açık, yazmaya devam</div>
+</div>
+<script>
+  var g = new URLSearchParams(location.search).get('gorsel');
+  if (g) document.getElementById('zemin').style.backgroundImage = 'url("' + g.replace(/"/g, '') + '")';
+</script>
+</body>
+</html>

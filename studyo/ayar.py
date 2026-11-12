@@ -89,6 +89,8 @@ VARSAYILAN = {
     # Kick chat kutusu (BotRix): [x, y, genislik, yukseklik], 1920x1080'de. Sagda: GTA'nin sag ust HUD'u
     # (para/silah) ve sag alttaki telefon acik kalir.
     "yayin_chat_kutusu": [1480, 170, 420, 420],
+    # Mola ekraninin zemini (kanal banner'i). Yoksa duz synthwave renk zemini kullanilir.
+    "yayin_mola_gorseli": os.path.join(os.path.expanduser("~"), "Desktop", "NightDriveClub", "banner_2560x1440.png"),
     # Yayindayken uzaktan oynatma bu kadar sn kesilirse ekran gizlenir (masaustu izleyiciye gorunmesin)
     "yayin_ekran_gizle_sn": 4,
     "obs_exe": r"C:\Program Files\obs-studio\bin\64bit\obs64.exe",

@@ -20,6 +20,9 @@ KATMAN = "Turkce altyazi (yayin)"
 KATMAN_HTML = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "yayin", "altyazi.html")
 # Kick chat ve takip/abone bildirimleri (BotRix web adresleri, studyo.yayin --katmanlar)
 WEB_KATMANLARI = {"chat": "Kick chat (yayin)", "bildirim": "Kick bildirimleri (yayin)"}
+# Mola ekrani: sahnenin en altinda; ekran yakalama gizlenince (uzaktan oynatma kesildi) siyah yerine bu gorunur
+MOLA = "Mola ekrani (yayin)"
+MOLA_HTML = os.path.join(os.path.dirname(KATMAN_HTML), "mola.html")
 # Kayit ses kanallari: 1 = videoya giren karisim (oyun + mikrofon), 2 = yalniz mikrofon (kurgu konusmayi bulur)
 KANAL_KARISIM, KANAL_MIKROFON = "1", "2"
 KAYIT_KANALLARI = "3"  # OBS Basit cikti: bit maskesi, 1|2 = kanal 1 ve 2
@@ -219,11 +222,30 @@ def xbox_sahnesi(cl):
     return yeni
 
 
-def yayin_sahnesi(cl, web=None, chat_kutusu=None):
-    """YAYIN OBS'i: kayit sahnesinin aynisi + canli altyazi + Kick chat/bildirimleri, hepsi hep acik.
-    Genel masaustu ve Mic/Aux sesleri kalici olarak kapali (Xbox sesi ve mikrofon sahnede; PC'nin bip/bildirim
-    sesleri yayina girmesin). web: {"chat": url, "bildirim": url}."""
+def _mola_kur(cl, gorsel=None):
+    """Sahnenin en altina mola ekrani (tam ekran, opak ekran yakalamanin arkasinda kalir)."""
+    url = "file:///" + MOLA_HTML.replace("\\", "/")
+    if gorsel and os.path.exists(gorsel):
+        url += "?gorsel=" + "file:///" + gorsel.replace("\\", "/")
+    ayar = {"is_local_file": False, "url": url, "width": 1920, "height": 1080, "shutdown": False,
+            "restart_when_active": False, "reroute_audio": False}
+    try:
+        cl.get_input_settings(MOLA)
+        cl.set_input_settings(MOLA, ayar, True)
+    except Exception:
+        cl.create_input(SAHNE, MOLA, "browser_source", ayar, True)
+        time.sleep(0.5)
+        _sigdir(cl, MOLA)
+    cl.set_scene_item_index(SAHNE, _oge(cl, MOLA), 0)
+    cl.set_scene_item_enabled(SAHNE, _oge(cl, MOLA), True)
+
+
+def yayin_sahnesi(cl, web=None, chat_kutusu=None, mola_gorseli=None):
+    """YAYIN OBS'i: kayit sahnesinin aynisi + canli altyazi + Kick chat/bildirimleri, hepsi hep acik; en altta
+    mola ekrani. Genel masaustu ve Mic/Aux sesleri kalici olarak kapali (Xbox sesi ve mikrofon sahnede; PC'nin
+    bip/bildirim sesleri yayina girmesin). web: {"chat": url, "bildirim": url}."""
     xbox_sahnesi(cl)
+    _mola_kur(cl, mola_gorseli)
     _katman_kur(cl, gorunur=True)
     for tur, url in (web or {}).items():
         if tur in WEB_KATMANLARI:
@@ -237,7 +259,7 @@ def yayin_sahnesi(cl, web=None, chat_kutusu=None):
 def katmanlari_kaldir(cl):
     """KAYIT OBS'inden yayin katmanlarini sil (eski surumde oradaydi)."""
     silinen = []
-    for ad in [KATMAN] + list(WEB_KATMANLARI.values()):
+    for ad in [KATMAN, MOLA] + list(WEB_KATMANLARI.values()):
         try:
             cl.remove_input(ad)
             silinen.append(ad)
