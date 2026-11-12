@@ -123,8 +123,31 @@ def luna_yeniden_baslat(ayar):
     return kapanan
 
 
+def _motor_sureci(yol):
+    import psutil
+    hedef = os.path.normcase(os.path.abspath(yol))
+    for p in psutil.process_iter(["name", "cmdline"]):
+        if "python" in (p.info.get("name") or "").lower() and any(
+                os.path.normcase(os.path.abspath(a)) == hedef for a in (p.info.get("cmdline") or [])[1:]
+                if a.lower().endswith(".py")):
+            return p
+    return None
+
+
+def motor_calistir(ayar):
+    """Altyazi motoru (xbox-samsung-subtitles-tv/motor/motor.py): ekrani golgeli on isleme + dengeleyiciyle okuyup
+    Luna'ya verir. Kendini uzaktan oynatmaya gore acip kapatir (oyun yokken ekrani okumaz), surekli calisabilir."""
+    yol = ayar.get("altyazi_motoru")
+    if not yol or not os.path.exists(yol) or _motor_sureci(yol):
+        return
+    log.info("altyazi motoru aciliyor")
+    subprocess.Popen([_pythonw(), yol], cwd=os.path.dirname(yol), creationflags=_GIZLI)
+
+
 def luna_calistir(ayar):
-    """LunaTranslator kapaliysa acar: TV altyazisi da yayin katmani da onun yerel servisine baglanir."""
+    """LunaTranslator kapaliysa acar: TV altyazisi da yayin katmani da onun yerel servisine baglanir.
+    Altyazi motoru ekrani okuyup Luna'ya verir; Luna'nin kendi OCR dongusu kapali (motor.py --luna-ocr kapat)."""
+    motor_calistir(ayar)
     klasor = os.path.dirname(ayar.get("luna_userconfig") or "")
     exe = os.path.join(klasor, "LunaTranslator.exe")
     if not os.path.exists(exe) or luna_acik_mi():
@@ -521,7 +544,9 @@ class Bekci:
                 satirlar.append("🎙 Mikrofon: %s" % ("kapalı 🔇" if sessiz else "açık"))
         except Exception as e:
             satirlar.append("OBS: %s" % str(e)[:80])
-        satirlar.append("🈯 Luna (altyazı): %s" % ("açık" if luna_acik_mi() else "kapalı"))
+        satirlar.append("🈯 Luna (çeviri): %s" % ("açık" if luna_acik_mi() else "kapalı"))
+        if self.ayar.get("altyazi_motoru"):
+            satirlar.append("🔤 Altyazı motoru: %s" % ("açık" if _motor_sureci(self.ayar["altyazi_motoru"]) else "kapalı"))
         if self.kuyruk.qsize():
             satirlar.append("🎬 Kurgu kuyruğu: %d kayıt" % self.kuyruk.qsize())
         return "\n".join(satirlar)
@@ -657,7 +682,8 @@ class Bekci:
 
     def calis(self):
         durdur = threading.Event()
-        yayin.bayrak(False)  # onceki calismadan kalmissa; yayin suruyorsa ilk tur yeniden koyar
+        yayin.bayrak(False)
+        motor_calistir(self.ayar)  # oyun yokken bekler; uzaktan oynatma baslayinca kendisi okumaya gecer  # onceki calismadan kalmissa; yayin suruyorsa ilk tur yeniden koyar
         threading.Thread(target=isaret_dinle, args=(self.ayar, durdur, self.istekler), daemon=True).start()
         threading.Thread(target=kurgu_isci, args=(self.ayar, self.kuyruk), daemon=True).start()
         threading.Thread(target=youtube_isci, args=(self.ayar, durdur), daemon=True).start()

@@ -77,6 +77,8 @@ VARSAYILAN = {
     "mikrofon_kaydi": True,
     # Uzaktan oynatma baslayinca LunaTranslator kapaliysa ac (TV altyazisi ve yayin katmani ona bagli)
     "luna_oto_baslat": True,
+    # Altyazi motoru (ekrani golgeli on isleme + dengeleyiciyle okuyup Luna'ya verir). Bos = Luna kendi okur.
+    "altyazi_motoru": os.path.join(os.path.expanduser("~"), "Desktop", "xbox-samsung-subtitles-tv", "motor", "motor.py"),
     # ---- Kick canli yayini (python -m studyo.yayin --kur / YAYIN_KUR.bat)
     # Yayin Telegram kumandasindan acilir/kapanir (python -m studyo.telegram --kur). Klavye tusu istenirse
     # "F10" gibi bir tus yaz; bos = kapali. Oynatma kapaninca yayin her durumda kendiliginden biter.
