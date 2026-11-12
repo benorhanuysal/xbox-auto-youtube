@@ -249,7 +249,8 @@ def _hakkinda_komutu():
         return
     print("---- YENI METIN (%d/%d karakter) ----\n%s\n-------------------------------------" % (
         len(yeni), HAKKINDA_SINIR, yeni))
-    if input("Kanala yazilsin mi? (e/h): ").strip().lower() not in ("e", "evet", "y"):
+    # PowerShell'den borulanan girdinin basinda BOM (﻿) olur; strip() onu silmez
+    if input("Kanala yazilsin mi? (e/h): ").replace("﻿", "").strip().lower() not in ("e", "evet", "y"):
         print("Vazgecildi, kanal degismedi.")
         return
     son = kanal_hakkinda(yeni, servis)

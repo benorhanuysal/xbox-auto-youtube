@@ -57,15 +57,38 @@ def mikrofon_egri(yol, sure_sn):
     return dizi if bulundu else np.array([])
 
 
+KONUSMA_UST = 15.0      # LU: kaydin sessizlik tabaninin bu kadar ustu = ses
+KONUSMA_EN_AZ = -50.0   # LUFS: esik bundan asagi inmez (RNNoise sessizligi ~-70'e ceker)
+DURAKLAMA = 1.2         # sn: cumle arasi bundan kisa susma ayni konusma sayilir
+EN_KISA_KONUSMA = 0.6   # sn: daha kisasi oksuruk, tik, masaya vurma
+PENCERE_GECIKMESI = 0.3 # sn: M son 400 ms'yi olcer, ses bitince deger bir sure yuksek kalir
+
+
 def konusmalar(dizi, adim=ADIM):
     """Mikrofon egrisinden konusma araliklari: [[bas_sn, son_sn], ...] (sirali, cakismasiz).
     dizi: mikrofon_egri ciktisi. Sessizlik RNNoise sonrasi ~-70..-55 LUFS, normal konusma ~-35..-20.
     Bos dizi -> []."""
     if not len(dizi):
         return []
-    # TODO(human): esik ustundeki ardisik olcumleri araliga cevir, kisa duraklamalari birlestir,
-    # cok kisa sesleri (oksuruk, masaya vurma) at.
-    return []
+    # Esik kaydin kendi sessizligine gore: mikrofon kazanci ya da oda gurultusu degisse de calisir.
+    # Ortanca degil %20'lik dilim: cok konusulan kayitta ortanca konusmanin kendisi olabilir.
+    esik = max(float(np.percentile(dizi, 20)) + KONUSMA_UST, KONUSMA_EN_AZ)
+    ses = np.concatenate(([0], (dizi > esik).astype(np.int8), [0]))
+    kenar = np.diff(ses)
+    araliklar = []
+    for b, s in zip(np.where(kenar == 1)[0] * adim, np.where(kenar == -1)[0] * adim):
+        if araliklar and b - araliklar[-1][1] <= DURAKLAMA:
+            araliklar[-1][1] = s   # kisa duraklama: ayni konusma
+        else:
+            araliklar.append([b, s])
+    # Pencere gecikmesi ve kisa ses elemesi birlestirmeden SONRA: duraklamalar olculdugu gibi karsilastirilir,
+    # konusmanin icindeki kisa kelime kaybolmaz, tek basina tik gider
+    sonuc = []
+    for b, s in araliklar:
+        s = max(b + adim, s - PENCERE_GECIKMESI)
+        if s - b >= EN_KISA_KONUSMA:
+            sonuc.append([round(float(b), 1), round(float(s), 1)])
+    return sonuc
 
 
 def heyecan(dizi, pencere=90):
