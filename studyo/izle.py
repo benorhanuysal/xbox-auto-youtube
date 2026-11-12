@@ -420,6 +420,7 @@ class Bekci:
     def istek_isle(self, eylem, zaman, aktif):
         if eylem == "yayin":  # klavye
             return self.yayin_ac_kapa(aktif)
+        log.info("telegram tusu: %s", eylem)
         if eylem == "yayin_ac":
             cevap = self.yayin_ac(aktif)
         elif eylem == "yayin_kapa":
