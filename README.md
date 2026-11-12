@@ -125,8 +125,11 @@ Koltuktan, telefondan: sohbetin altında sabit tuşlar.
 |---|---|
 | ⭐ İşaretle | F9 ile aynı: o anın son ~25 sn'si videoya mutlaka girer (basıldığın saniye kullanılır) |
 | 🔴 Yayını başlat / ⏹ Yayını bitir | Kick yayını (yalnız uzaktan oynatma açıkken açılır) |
-| 📊 Durum | Uzaktan oynatma, kayıt süresi, yayın süresi, mikrofon, Luna, kurgu kuyruğu |
-| 🎙 Mikrofon aç/kapa | OBS'teki mikrofonu susturur/açar (kayıt + yayın) |
+| ☕ Mola | Yayında oyun görüntüsünü elle gizler, mola ekranı çıkar (Xbox'ta şifre girerken, kalkarken); tekrar basınca geri gelir |
+| 💬 Yayın altyazısı | Kick'teki canlı Türkçe altyazıyı aç/kapa (TV'deki altyazı etkilenmez) |
+| 🎙 Mikrofon | İki OBS'te birlikte mikrofonu susturur/açar (kayıt + yayın) |
+| 📊 Durum | Uzaktan oynatma, kayıt süresi, yayın süresi, mola, mikrofon, Luna, kurgu kuyruğu |
+| 🔁 Luna'yı yeniden başlat | Altyazı takılırsa Luna'yı kapatıp açar |
 
 Bekçinin bütün bildirimleri (kayıt başladı, videolar hazır, yayın başladı/bitti, yeni yorumlar, rapor) telefona da gelir; yayındayken ekrana hiç düşmez.
 

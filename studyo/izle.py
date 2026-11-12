@@ -105,6 +105,24 @@ def luna_acik_mi():
     return "lunatranslator" in r.stdout.lower()
 
 
+def luna_yeniden_baslat(ayar):
+    """Takilan altyaziyi koltuktan duzeltmek icin: Luna sureclerini kapat, yeniden ac."""
+    import psutil
+    kapanan = 0
+    for p in psutil.process_iter(["name"]):
+        if "lunatranslator" in (p.info.get("name") or "").lower():
+            try:
+                p.terminate()
+                kapanan += 1
+            except psutil.Error:
+                pass
+    psutil.wait_procs([p for p in psutil.process_iter(["name"])
+                       if "lunatranslator" in (p.info.get("name") or "").lower()], timeout=10)
+    time.sleep(1)
+    luna_calistir(ayar)
+    return kapanan
+
+
 def luna_calistir(ayar):
     """LunaTranslator kapaliysa acar: TV altyazisi da yayin katmani da onun yerel servisine baglanir."""
     klasor = os.path.dirname(ayar.get("luna_userconfig") or "")
@@ -309,6 +327,8 @@ class Bekci:
         self.yayinda = False
         self.yayin_oto = False    # yayini biz mi actik (oturum bitince biz kapatiriz)
         self.ekran_gizli = False
+        self.mola_elle = False    # Telegram "Mola": oyun goruntusu elle gizli
+        self.yayin_altyazi = True # Telegram "Yayin altyazisi": Kick'teki canli altyazi acik mi
         self.yayin_istendi = None # start_stream zamani: yayin bu surede baslamazsa haber ver
         self.son_on_plan = None
 
@@ -422,7 +442,7 @@ class Bekci:
             return ("Yayın OBS'i açılamadı." if cl2 is None else
                     "Kick ayarlı değil: YAYIN_KUR.bat ile yayın adresini ve anahtarını gir.")
         yayin.hazirla(cl2, self.ayar)  # sahne + altyazi + chat + bildirimler, ekran acik
-        self.ekran_gizli = False
+        self.ekran_gizli, self.mola_elle, self.yayin_altyazi = False, False, True
         cl2.start_stream()
         self.yayin_oto, self.yayin_istendi = True, time.time()
         log.info("yayin baslatiliyor")
@@ -460,6 +480,26 @@ class Bekci:
         log.info("mikrofon %s (telegram)", "kapatildi" if sessiz else "acildi")
         return "🎙 Mikrofon KAPALI 🔇" if sessiz else "🎙 Mikrofon AÇIK"
 
+    def mola_degistir(self):
+        cl2 = self._yayin_baglanti()
+        if cl2 is None or not obs.yayinda_mi(cl2):
+            return "Yayın açık değil; mola yalnız yayındayken işe yarar."
+        self.mola_elle = not self.mola_elle
+        self.ekran_gizli = self.mola_elle
+        obs.ekran_goster(cl2, not self.mola_elle)
+        log.info("mola %s (telegram)", "basladi" if self.mola_elle else "bitti")
+        return ("☕ Mola: yayında oyun görüntüsü gizlendi, izleyici mola ekranını görüyor. Bitince tekrar bas."
+                if self.mola_elle else "▶️ Mola bitti, oyun görüntüsü yayında.")
+
+    def yayin_altyazi_degistir(self):
+        cl2 = self._yayin_baglanti()
+        if cl2 is None or not obs.yayinda_mi(cl2):
+            return "Yayın açık değil."
+        self.yayin_altyazi = not self.yayin_altyazi
+        cl2.set_scene_item_enabled(obs.SAHNE, obs._oge(cl2, obs.KATMAN), self.yayin_altyazi)
+        log.info("yayin altyazisi %s (telegram)", "acildi" if self.yayin_altyazi else "kapatildi")
+        return "💬 Yayın altyazısı AÇIK" if self.yayin_altyazi else "💬 Yayın altyazısı KAPALI (TV'de görmeye devam edersin)"
+
     def durum_metni(self, aktif):
         satirlar = ["🎮 Uzaktan oynatma: %s" % ("açık" if aktif else "kapalı")]
         cl, cl2 = self._baglanti(), self._yayin_baglanti()
@@ -471,6 +511,11 @@ class Bekci:
                 satirlar.append("⏺ Kayıt: %s" % ("sürüyor (%d dk)" % (k.output_duration / 60000) if k.output_active else "yok"))
             y = cl2.get_stream_status() if cl2 is not None else None
             satirlar.append("🔴 Yayın: %s" % ("AÇIK (%d dk)" % (y.output_duration / 60000) if y and y.output_active else "kapalı"))
+            if y and y.output_active:
+                if self.mola_elle:
+                    satirlar.append("☕ Mola: açık (oyun görüntüsü gizli)")
+                if not self.yayin_altyazi:
+                    satirlar.append("💬 Yayın altyazısı: kapalı")
             if cl or cl2:
                 sessiz = (cl or cl2).get_input_mute(obs.MIKROFON).input_muted
                 satirlar.append("🎙 Mikrofon: %s" % ("kapalı 🔇" if sessiz else "açık"))
@@ -499,6 +544,13 @@ class Bekci:
             cevap = self.durum_metni(aktif)
         elif eylem == "mikrofon":
             cevap = self.mikrofon_degistir()
+        elif eylem == "mola":
+            cevap = self.mola_degistir()
+        elif eylem == "yayin_altyazi":
+            cevap = self.yayin_altyazi_degistir()
+        elif eylem == "luna":
+            kapanan = luna_yeniden_baslat(self.ayar)
+            cevap = "🔁 Luna %s; açılması ~10 sn sürer." % ("yeniden başlatıldı" if kapanan else "kapalıydı, açıldı")
         else:
             cevap = telegram.YARDIM
         telegram.gonder(cevap)
@@ -513,7 +565,7 @@ class Bekci:
             bildirim("🔴 Yayın başladı", "Kick'te canlısın: Türkçe altyazı, chat ve bildirimler açık. Kayıt temiz.")
             return
         SESSIZ.clear()
-        self.yayin_oto, self.ekran_gizli = False, False
+        self.yayin_oto, self.ekran_gizli, self.mola_elle, self.yayin_altyazi = False, False, False, True
         bildirim("Yayin bitti", "Kick yayini kapandi.")
         threading.Thread(target=self._yayin_obs_kapat, daemon=True).start()
 
@@ -535,7 +587,7 @@ class Bekci:
                 bildirim("Yayın başlamadı", "OBS 30 sn'de Kick'e bağlanamadı (anahtar ya da internet). Tekrar dene.")
                 threading.Thread(target=self._yayin_obs_kapat, daemon=True).start()
             return
-        gizle = simdi - self.son_aktif >= self.ayar["yayin_ekran_gizle_sn"]
+        gizle = self.mola_elle or simdi - self.son_aktif >= self.ayar["yayin_ekran_gizle_sn"]
         if gizle != self.ekran_gizli:
             try:
                 obs.ekran_goster(cl2, not gizle)

@@ -26,19 +26,29 @@ log = logging.getLogger("izle")
 ISARET = "⭐ İşaretle"
 YAYIN_AC = "🔴 Yayını başlat"
 YAYIN_KAPA = "⏹ Yayını bitir"
+MOLA = "☕ Mola"
+YAYIN_ALTYAZI = "💬 Yayın altyazısı"
 DURUM = "📊 Durum"
-MIKROFON = "🎙 Mikrofon aç/kapa"
-EYLEMLER = {ISARET: "isaret", YAYIN_AC: "yayin_ac", YAYIN_KAPA: "yayin_kapa", DURUM: "durum",
-            MIKROFON: "mikrofon", "/durum": "durum", "/start": "yardim", "/yardim": "yardim"}
+MIKROFON = "🎙 Mikrofon"
+LUNA = "🔁 Luna'yı yeniden başlat"
+EYLEMLER = {ISARET: "isaret", YAYIN_AC: "yayin_ac", YAYIN_KAPA: "yayin_kapa", MOLA: "mola",
+            YAYIN_ALTYAZI: "yayin_altyazi", DURUM: "durum", MIKROFON: "mikrofon", LUNA: "luna",
+            "🎙 Mikrofon aç/kapa": "mikrofon",  # eski klavyeden basilirsa
+            "/durum": "durum", "/start": "yardim", "/yardim": "yardim"}
 KLAVYE = {"keyboard": [[{"text": ISARET}],
                        [{"text": YAYIN_AC}, {"text": YAYIN_KAPA}],
-                       [{"text": DURUM}, {"text": MIKROFON}]],
+                       [{"text": MOLA}, {"text": YAYIN_ALTYAZI}],
+                       [{"text": MIKROFON}, {"text": DURUM}],
+                       [{"text": LUNA}]],
           "resize_keyboard": True, "is_persistent": True}
 YARDIM = ("Night Drive Club kumandası\n\n"
           "⭐ İşaretle: güzel bir an olunca hemen ardından bas, son ~25 sn videoya mutlaka girer.\n"
           "🔴 / ⏹ Kick yayınını başlat / bitir (Xbox uzaktan oynatma açıkken).\n"
+          "☕ Mola: yayında oyun görüntüsünü gizle, mola ekranı çıksın (tekrar bas: geri gelir).\n"
+          "💬 Yayın altyazısı: Kick'teki canlı Türkçe altyazıyı aç/kapa.\n"
+          "🎙 Mikrofon: kayıtta ve yayında sesini kapat/aç.\n"
           "📊 Durum: oynatma, kayıt, yayın, mikrofon, Luna.\n"
-          "🎙 Mikrofonu kapat/aç (kayıt ve yayın için).")
+          "🔁 Luna'yı yeniden başlat: altyazı takılırsa.")
 ESKI_KOMUT_SN = 120  # telefon cevrimdisiyken birikmis komutlar sonradan calismasin
 
 
