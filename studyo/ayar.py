@@ -75,6 +75,14 @@ VARSAYILAN = {
     # Mikrofon (Windows varsayilan kayit aygiti) kayda girsin: yorum videoya ozgun deger katar,
     # kurgu konustugun anlari ayri ses kanalindan bulup one cikarir
     "mikrofon_kaydi": True,
+    # Uzaktan oynatma baslayinca LunaTranslator kapaliysa ac (TV altyazisi ve yayin katmani ona bagli)
+    "luna_oto_baslat": True,
+    # ---- Kick canli yayini (python -m studyo.yayin --kur / YAYIN_KUR.bat)
+    # Uzaktan oynatma acikken bu tus yayini acar/kapatir; oynatma kapaninca yayin kendiliginden biter
+    "yayin_tusu": "F10",
+    "yayin_bit_hizi": 6000,   # kbps; Kick en fazla 8000, 1080p60 icin 6000 yeterli
+    # Yayindayken uzaktan oynatma bu kadar sn kesilirse ekran gizlenir (masaustu izleyiciye gorunmesin)
+    "yayin_ekran_gizle_sn": 4,
     "obs_exe": r"C:\Program Files\obs-studio\bin\64bit\obs64.exe",
 }
 

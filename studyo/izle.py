@@ -4,6 +4,8 @@
 - Kayit durunca (otomatik ya da elle) kurguyu baslatir; bitince Windows bildirimi gelir.
 - Isaret: klavyede F9 ya da kumandada iki analog cubuga birlikte basmak o ani isaretler;
   isaretli anlar videoya mutlaka girer.
+- Kick yayini: uzaktan oynatma acikken F10 yayini acar/kapatir. Yayinda Turkce altyazi katmani goruntude olur,
+  bildirimler susar (ekrana dusup yayina girmesin), oynatma kesilince ekran gizlenir, oturum bitince yayin kapanir.
 
   python -m studyo.izle            bekciyi calistir (pencere kapaninca durur)
   python -m studyo.izle --kur      OBS uzaktan kumandasini ac + Windows acilisinda calistir
@@ -22,7 +24,7 @@ import sys
 import threading
 import time
 
-from . import ayar as ayar_modulu, isaret, kayit, obs
+from . import ayar as ayar_modulu, isaret, kayit, obs, yayin
 
 KOK = ayar_modulu.KOK
 log = logging.getLogger("izle")
@@ -43,8 +45,13 @@ $id = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.
 """
 
 
+SESSIZ = threading.Event()  # yayindayken: bildirim ekrana (dolayisiyla yayina) dusmesin, yalniz gunluge
+
+
 def bildirim(baslik, metin):
-    log.info("bildirim: %s - %s", baslik, metin)
+    log.info("bildirim%s: %s - %s", " (yayinda, gosterilmedi)" if SESSIZ.is_set() else "", baslik, metin)
+    if SESSIZ.is_set():
+        return
     try:
         ortam = dict(os.environ, TOST_BASLIK=baslik, TOST_METIN=metin)
         subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-Command", _TOST], env=ortam,
@@ -64,6 +71,32 @@ def xbox_sesi_akiyor():
         except Exception:
             continue
     return False
+
+
+def luna_calistir(ayar):
+    """LunaTranslator kapaliysa acar: TV altyazisi da yayin katmani da onun yerel servisine baglanir."""
+    klasor = os.path.dirname(ayar.get("luna_userconfig") or "")
+    exe = os.path.join(klasor, "LunaTranslator.exe")
+    if not os.path.exists(exe):
+        return
+    r = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True, errors="replace",
+                       creationflags=_GIZLI)
+    if "lunatranslator" in r.stdout.lower():
+        return
+    log.info("LunaTranslator kapaliydi, aciliyor")
+    subprocess.Popen([exe], cwd=klasor)
+
+
+def _bip(tur):
+    """Yayin tusu geri bildirimi (PC hoparlorunden; kayda/yayina girmez, orada yalniz Xbox sesi var)."""
+    import winsound
+    sesler = {"ac": [(800, 90), (1200, 90), (1600, 140)], "kapa": [(1600, 90), (1200, 90), (800, 140)],
+              "hata": [(400, 180), (400, 180)]}
+    try:
+        for frekans, sure in sesler[tur]:
+            winsound.Beep(frekans, sure)
+    except RuntimeError:
+        pass
 
 
 # ---------------------------------------------------------------- isaret tuslari
@@ -96,15 +129,23 @@ def _tus_kodu(ad):
     return None
 
 
-def isaret_dinle(ayar, durdur):
+def isaret_dinle(ayar, durdur, istekler=None):
     vk = _tus_kodu(ayar["isaret_tusu"])
+    vk_yayin = _tus_kodu(ayar.get("yayin_tusu")) if istekler is not None else None
     xget = _xinput() if ayar["kumanda_isaret"] else None
     tus_onceki, cubuk_onceki, son = False, {}, 0.0
+    yayin_onceki, yayin_son = False, 0.0
     bagli = {i: True for i in range(4)}
     son_tarama = 0.0
     durum = _DURUM()
     import winsound
     while not durdur.is_set():
+        if vk_yayin:
+            simdi = bool(ctypes.windll.user32.GetAsyncKeyState(vk_yayin) & 0x8000)
+            if simdi and not yayin_onceki and time.time() - yayin_son > 3:
+                yayin_son = time.time()
+                istekler.put("yayin")  # OBS islemi ana dongude (tek baglanti, sirali)
+            yayin_onceki = simdi
         basildi = False
         if vk:
             simdi = bool(ctypes.windll.user32.GetAsyncKeyState(vk) & 0x8000)
@@ -227,6 +268,11 @@ class Bekci:
         self.kayitta = False
         self.xbox_kaydi = False   # suren kayit Xbox sahnesinde mi (SCUM vb. elle kayitlar kurguya girmesin)
         self.kuyruk = queue.Queue()
+        self.istekler = queue.Queue()  # tus dinleyiciden: "yayin"
+        self.yayinda = False
+        self.yayin_oto = False    # yayini biz mi actik (oturum bitince biz kapatiriz)
+        self.ekran_gizli = False
+        self.ertelenen = None     # yayin surerken kayit biterse sahne geri yuklemesi yayin sonuna kalir
 
     def _baglanti(self, bekle=0):
         if self.cl is not None:
@@ -277,7 +323,10 @@ class Bekci:
     def _kayit_bitti(self, cl):
         """Kayit durdu (otomatik ya da elle): ayarlari geri yukle, kurguyu kuyruga ekle."""
         if self.oto:
-            obs.geri_yukle(cl, self.onceki)
+            if self.yayinda:
+                self.ertelenen = self.onceki  # sahne simdi degisirse yayinda baska sahne gorunur
+            else:
+                obs.geri_yukle(cl, self.onceki)
         xbox_kaydi = self.xbox_kaydi
         self.oto, self.onceki, self.xbox_kaydi = False, None, False
         if not self.ayar["oto_kurgu"] or not xbox_kaydi:
@@ -290,14 +339,90 @@ class Bekci:
             log.info("kurgu kuyruga eklendi: %s", yol)
             self.kuyruk.put(yol)
 
+    # ------------------------------------------------------------ Kick yayini
+    def yayin_ac_kapa(self, aktif):
+        cl = self._baglanti()
+        if cl is not None and obs.yayinda_mi(cl):
+            cl.stop_stream()
+            log.info("yayin kapatiliyor (tus)")
+            _bip("kapa")
+            return
+        if not aktif:
+            log.info("yayin acilmadi: uzaktan oynatma kapali")
+            _bip("hata")
+            return
+        SESSIZ.set()  # "Kayit basladi" bildirimi de ekrana dusmesin
+        if not self.kayitta:
+            self.kayit_baslat()  # sahneyi (goruntu, Xbox sesi, mikrofon) kurar; yayinin kaydi da olsun
+        cl = self._baglanti()
+        if cl is None or not yayin.ayarli_mi(cl):
+            SESSIZ.clear()
+            _bip("hata")
+            bildirim("Kick ayarli degil", "YAYIN_KUR.bat ile Kick yayin adresini ve anahtarini gir.")
+            return
+        cl.set_current_program_scene(obs.SAHNE)
+        obs.ekran_goster(cl, True)
+        obs.katman_goster(cl, True)
+        cl.start_stream()
+        self.yayin_oto = True
+        log.info("yayin baslatiliyor (tus)")
+        _bip("ac")
+
+    def _yayin_degisti(self, cl, yayinda):
+        self.yayinda = yayinda
+        yayin.olay_yaz("BASLA" if yayinda else "BITTI")
+        log.info("yayin %s", "basladi" if yayinda else "bitti")
+        try:
+            obs.katman_goster(cl, yayinda)
+        except Exception as e:
+            log.warning("altyazi katmani ayarlanamadi: %s", e)
+        if yayinda:
+            SESSIZ.set()
+            return
+        SESSIZ.clear()
+        self.yayin_oto = False
+        if self.ekran_gizli:
+            obs.ekran_goster(cl, True)
+            self.ekran_gizli = False
+        if self.ertelenen is not None:
+            obs.geri_yukle(cl, self.ertelenen)
+            self.ertelenen = None
+        bildirim("Yayin bitti", "Kick yayini kapandi.")
+
+    def _yayin_turu(self, cl, simdi, oturum_bitti):
+        try:
+            yayinda = obs.yayinda_mi(cl)
+        except Exception:
+            return
+        if yayinda != self.yayinda:
+            self._yayin_degisti(cl, yayinda)
+        if not yayinda:
+            return
+        gizle = simdi - self.son_aktif >= self.ayar["yayin_ekran_gizle_sn"]
+        if gizle != self.ekran_gizli:
+            try:
+                obs.ekran_goster(cl, not gizle)
+                self.ekran_gizli = gizle
+                log.info("yayinda ekran %s", "gizlendi (uzaktan oynatma kesildi)" if gizle else "geri acildi")
+            except Exception as e:
+                log.warning("ekran gizlenemedi: %s", e)
+        if self.yayin_oto and oturum_bitti:
+            cl.stop_stream()
+            log.info("yayin kapatiliyor (uzaktan oynatma bitti)")
+
     def tur(self):
         simdi = time.time()
         aktif = xbox_sesi_akiyor()
         if aktif:
+            if self.ilk_aktif is None and self.ayar.get("luna_oto_baslat", True):
+                luna_calistir(self.ayar)  # oynatma yeni basladi
             self.son_aktif = simdi
             self.ilk_aktif = self.ilk_aktif or simdi
         else:
             self.ilk_aktif = None
+        while not self.istekler.empty():
+            if self.istekler.get_nowait() == "yayin":
+                self.yayin_ac_kapa(aktif)
         oturum_bitti = simdi - self.son_aktif >= self.ayar["oto_kayit_dur_sn"]
         if oturum_bitti:
             self.elle_durdu = False
@@ -318,6 +443,8 @@ class Bekci:
                 self.elle_durdu = True  # oynarken elle durduruldu
             self._kayit_bitti(cl)
         self.kayitta = kayitta
+        if cl is not None:
+            self._yayin_turu(cl, simdi, oturum_bitti)
 
         if not self.ayar["oto_kayit"]:
             return
@@ -329,11 +456,13 @@ class Bekci:
 
     def calis(self):
         durdur = threading.Event()
-        threading.Thread(target=isaret_dinle, args=(self.ayar, durdur), daemon=True).start()
+        yayin.acik_kalani_kapat()
+        threading.Thread(target=isaret_dinle, args=(self.ayar, durdur, self.istekler), daemon=True).start()
         threading.Thread(target=kurgu_isci, args=(self.ayar, self.kuyruk), daemon=True).start()
         threading.Thread(target=youtube_isci, args=(self.ayar, durdur), daemon=True).start()
-        log.info("bekci basladi (oto_kayit=%s, oto_kurgu=%s, isaret=%s%s)", self.ayar["oto_kayit"], self.ayar["oto_kurgu"],
-                 self.ayar["isaret_tusu"], " + iki analog" if self.ayar["kumanda_isaret"] else "")
+        log.info("bekci basladi (oto_kayit=%s, oto_kurgu=%s, isaret=%s%s, yayin=%s)", self.ayar["oto_kayit"],
+                 self.ayar["oto_kurgu"], self.ayar["isaret_tusu"], " + iki analog" if self.ayar["kumanda_isaret"] else "",
+                 self.ayar.get("yayin_tusu"))
         try:
             while True:
                 try:

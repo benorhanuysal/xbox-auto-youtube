@@ -14,7 +14,7 @@ import re
 import sys
 import time
 
-from . import aday, altyazi, altyazi_duzelt, ayar as ayar_modulu, isaret, kayit, kurgu, plan as plan_modulu, ses
+from . import aday, altyazi, altyazi_duzelt, ayar as ayar_modulu, isaret, kayit, kurgu, plan as plan_modulu, ses, yayin
 
 
 def _yaz(metin):
@@ -238,6 +238,15 @@ def main():
         kalan = {id(s) for s in altyazi_duzelt.duzelt(kullanilan, ayar, cikti, _yaz)}
         satirlar = [s for s in satirlar if id(s) in kalan or s not in kullanilan]
 
+    # Kick yayini surerken canli Turkce altyazi katmani goruntudeydi: o araliklarda altyazi ikinci kez gomulmez
+    # (SRT altyazi parcalari yine tum satirlarla yazilir)
+    canli = yayin.kayittakiler(bas, sure)
+    canli_satirlar = {id(s) for s in yayin.gomulmeyecekler(satirlar, canli)}
+    gomulecek = [s for s in satirlar if id(s) not in canli_satirlar]
+    if canli:
+        _yaz("  Canli yayin araligi: %d (%.0f dk), %d satir zaten goruntude" % (
+            len(canli), sum(s - b for b, s in canli) / 60, len(canli_satirlar)))
+
     ad_kod, _ = kurgu.kodlayici()
     _yaz("4/5 Kurgu (kodlayici: %s)" % ad_kod)
     bilgi = {}
@@ -252,7 +261,7 @@ def main():
     if plan["uzun"]["parcalar"]:
         _yaz("  Uzun video")
         dosya = os.path.join(cikti, "uzun.mp4")
-        giren = kurgu.video_yap(yol, plan["uzun"]["parcalar"], dosya, "yatay", satirlar, None, ayar["altyazi_gom"], _yaz)
+        giren = kurgu.video_yap(yol, plan["uzun"]["parcalar"], dosya, "yatay", gomulecek, None, ayar["altyazi_gom"], _yaz)
         # Kapak: en heyecanli secilen sahnenin ortasi
         en_iyi = max(plan["uzun"]["parcalar"], key=lambda p: heyecan[int(p[0]):int(p[1]) + 1].max() if len(heyecan) else 0)
         kurgu.kucuk_resim(yol, (en_iyi[0] + en_iyi[1]) / 2, os.path.join(cikti, "uzun_kapak.jpg"))
@@ -263,7 +272,7 @@ def main():
     for i, s in enumerate(plan["shorts"], 1):
         _yaz("  Shorts %d" % i)
         dosya = os.path.join(cikti, "short_%d.mp4" % i)
-        giren = kurgu.video_yap(yol, s["parcalar"], dosya, "dikey", satirlar, s["baslik"], ayar["altyazi_gom"], _yaz)
+        giren = kurgu.video_yap(yol, s["parcalar"], dosya, "dikey", gomulecek, s["baslik"], ayar["altyazi_gom"], _yaz)
         bilgi["short_%d" % i] = {"parcalar": giren, "sure_sn": _altyazi_dosyalari("short_%d" % i, giren)}
     _kurgu_bilgisi_yaz(cikti, bilgi)
     videolar = _videolar_listesi(cikti, plan, bilgi)

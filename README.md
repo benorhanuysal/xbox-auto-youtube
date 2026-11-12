@@ -93,6 +93,18 @@ Konuştuğun anlar aday sahne olur ve öne çıkar, Claude yorumu ortadan kesmez
 
 Belirli bir kayıt için: `YAP.bat "D:\Kayitlar\2026-11-12 21-30-05.mkv"`. Sadece planı görmek için: `YAP.bat --sadece-plan`. Tek bir planlayıcı için: `YAP.bat --planlayici gemini` (`claude` / `gemini` / `yok`).
 
+## Kick'te canlı yayın (Türkçe altyazılı)
+Kurulum (bir kez): **`YAYIN_KUR.bat`** → Kick'te *Yayıncı Paneli (Creator Dashboard) → Stream URL and Key*'den adresi ve anahtarı yapıştır (anahtar ekranda görünmez, yalnız OBS'in kendi ayarına yazılır). OBS 1080p60, NVENC, CBR **6000 kbps**, 2 sn anahtar kare olarak ayarlanır. Kick API'si / Geliştirici Modu gerekmez.
+
+Oynarken: uzaktan oynatma açıkken klavyede **F10** → yayın başlar (yükselen üç bip), tekrar F10 → biter (alçalan bip). Kayıt da açılır; yayının videosu da YouTube kurgusuna girer.
+
+- **Canlı Türkçe altyazı:** `yayin/altyazi.html` OBS'te tarayıcı kaynağı olarak Luna'nın çevirilerini gösterir (TV uygulamasıyla aynı akış). Yalnız yayın sürerken görünür. Ortadaki 600 px'lik sütunda durur, oyunun İngilizce altyazısını örtmez ve kayıttan dikey Shorts kesilince kırpılmaz.
+- **Kurgu uyumu:** Yayın aralıkları `yayin_araliklari.txt`'ye yazılır. Kurgu o aralıklarda altyazıyı ikinci kez gömmez (zaten görüntüde); YouTube altyazı parçaları yine tam yüklenir.
+- **Mahremiyet:** OBS PC ekranının tamamını yakalar. Yayındayken bekçinin bildirimleri susar; uzaktan oynatma 4 sn kesilirse ekran gizlenir (izleyici siyah ekran görür, masaüstünü değil); oturum bitince (1 dk) yayın kendiliğinden kapanır. Diğer uygulamaların bildirimleri için Windows'ta *Ayarlar → Sistem → Bildirimler → Rahatsız etmeyi otomatik aç → Tam ekran modunda bir uygulama kullanırken*'i aç.
+- **Luna:** Uzaktan oynatma başlayınca kapalıysa bekçi açar (`luna_oto_baslat`).
+
+Ayarlar: `yayin_tusu` (`"F10"`), `yayin_bit_hizi` (6000), `yayin_ekran_gizle_sn` (4). Katmanı denemek: `python -m studyo.yayin --dene` (örnek altyazıyla OBS görüntüsü alır).
+
 ## YouTube'a otomatik yükleme
 Kurgu bitince uzun video ve Shorts'lar başlık, açıklama, etiket ve (uzun videoda) kapakla **gizli** yüklenir; Studio'da kontrol edip tek tıkla yayınlarsın. Linkler `cikti/<kayit>/youtube_linkleri.txt`'ye yazılır, Windows bildirimi gelir. 2 Kasım 2026'dan beri Google'ın denetiminden (audit) geçmemiş API projelerinin videoları artık gizliye kilitlenmiyor ([revision history](https://developers.google.com/youtube/v3/revision_history)); yükleme kotası ayrı: günde 100 video.
 

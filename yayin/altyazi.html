@@ -1,0 +1,98 @@
+<!doctype html>
+<!-- Canli yayin icin Turkce altyazi katmani (OBS tarayici kaynagi, 1920x1080, saydam).
+     LunaTranslator'in yerel servisine baglanir: ws://127.0.0.1:2333/api/ws/text/trans (TV uygulamasiyla ayni akis).
+     Kutu ortadaki 600 px'lik sutunda durur: kayittan dikey (9:16) Shorts kesilince altyazi kirpilmaz.
+     Oyunun Ingilizce altyazisinin (ekranin alt ~%19'u) ustunde kalir, onu ortmez.
+     Adres parametreleri: ?port=2333  ?alt=215 (alttan px)  ?test=1 (ornek satirlar) -->
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Turkce altyazi</title>
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+  #kutu {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 215px; width: 600px;
+    display: flex; flex-direction: column; align-items: center;
+    font-family: "Segoe UI", Arial, sans-serif;
+  }
+  .satir {
+    max-width: 600px; box-sizing: border-box; margin-top: 6px; padding: 3px 14px 5px;
+    border-radius: 8px; background: rgba(0, 0, 0, 0.62);
+    color: #fff; font-size: 38px; font-weight: 700; line-height: 1.22; text-align: center;
+    text-shadow: 0 2px 3px #000; transition: opacity 0.35s, font-size 0.2s;
+  }
+  .satir.eski { opacity: 0.55; font-size: 30px; }
+  .satir.sonuyor { opacity: 0; }
+</style>
+</head>
+<body>
+<div id="kutu"></div>
+<script>
+(function () {
+  'use strict';
+  var p = new URLSearchParams(location.search);
+  var PORT = p.get('port') || '2333';
+  var EN_FAZLA_SATIR = 2;
+  var kutu = document.getElementById('kutu');
+  if (p.get('alt')) kutu.style.bottom = parseInt(p.get('alt'), 10) + 'px';
+
+  function kaldir(el) {
+    if (!el.parentNode || el.classList.contains('sonuyor')) return;
+    el.classList.add('sonuyor');
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
+  }
+
+  function goster(metin) {
+    metin = String(metin || '').trim();
+    if (!metin) return;
+    var eskiler = kutu.querySelectorAll('.satir:not(.sonuyor)');
+    if (eskiler.length && eskiler[eskiler.length - 1].textContent === metin) return;
+    for (var i = 0; i < eskiler.length; i++) {
+      eskiler[i].classList.add('eski');
+      if (i <= eskiler.length - EN_FAZLA_SATIR) kaldir(eskiler[i]);
+    }
+    var el = document.createElement('div');
+    el.className = 'satir';
+    el.textContent = metin;
+    kutu.appendChild(el);
+    // Ekranda kalma: uzunluga gore 4-10 sn (TV uygulamasiyla ayni)
+    setTimeout(function () { kaldir(el); }, Math.min(10000, Math.max(4000, metin.length * 90)));
+  }
+
+  function mesajdanMetin(veri) {
+    // Luna duz metin ya da JSON gonderebilir
+    if (typeof veri !== 'string') return '';
+    var t = veri.trim();
+    if (t.charAt(0) === '{' || t.charAt(0) === '[') {
+      try {
+        var j = JSON.parse(t);
+        if (Array.isArray(j)) j = j[j.length - 1];
+        if (j && typeof j === 'object') return j.result || j.text || j.trans || j.translation || j.content || '';
+      } catch (e) { /* duz metin */ }
+    }
+    return t;
+  }
+
+  var bekleme = 1000;
+  function baglan() {
+    var ws;
+    try { ws = new WebSocket('ws://127.0.0.1:' + PORT + '/api/ws/text/trans'); }
+    catch (e) { return yeniden(); }
+    ws.onopen = function () { bekleme = 1000; };
+    ws.onmessage = function (ev) { goster(mesajdanMetin(ev.data)); };
+    ws.onclose = yeniden;  // Luna kapaliysa/yeniden acildiysa kendiliginden baglanir
+  }
+  function yeniden() {
+    setTimeout(baglan, bekleme);
+    bekleme = Math.min(5000, bekleme * 2);
+  }
+
+  if (p.get('test')) {
+    goster('Lester yine bir iş ayarlamış, ama bu sefer işin içinde bir bit yeniği var.');
+    setTimeout(function () { goster('Hadi, gidelim! Polisler her an burada olabilir!'); }, 1200);
+  }
+  baglan();
+})();
+</script>
+</body>
+</html>

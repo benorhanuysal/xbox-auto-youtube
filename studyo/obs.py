@@ -13,6 +13,9 @@ SAHNE = "Xbox (otomatik)"
 GORUNTU = "Xbox goruntu"
 SES = "Xbox ses"
 MIKROFON = "Mikrofon"
+# Canli yayin altyazi katmani: yalniz yayin surerken gorunur (kayitta kurgu kendi duzeltilmis altyazisini gomer)
+KATMAN = "Turkce altyazi (yayin)"
+KATMAN_HTML = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "yayin", "altyazi.html")
 # Kayit ses kanallari: 1 = videoya giren karisim (oyun + mikrofon), 2 = yalniz mikrofon (kurgu konusmayi bulur)
 KANAL_KARISIM, KANAL_MIKROFON = "1", "2"
 KAYIT_KANALLARI = "3"  # OBS Basit cikti: bit maskesi, 1|2 = kanal 1 ve 2
@@ -136,7 +139,40 @@ def xbox_sahnesi(cl):
                         {"window": XBOX_PENCERE, "priority": ONCELIK_EXE}, True)
     _goruntu_kur(cl)
     _mikrofon_kur(cl)
+    _katman_kur(cl)
     return yeni
+
+
+def _oge(cl, kaynak):
+    return _ozellik(cl.get_scene_item_id(SAHNE, kaynak), "scene_item_id")
+
+
+def _katman_kur(cl):
+    """Tarayici kaynagi; ilk kurulumda gizli. Her cagrida dosya yolu ve en ustte olmasi tazelenir."""
+    ayar = {"is_local_file": True, "local_file": KATMAN_HTML, "width": 1920, "height": 1080,
+            "shutdown": False, "restart_when_active": False, "reroute_audio": False, "css": ""}
+    try:
+        cl.get_input_settings(KATMAN)
+        cl.set_input_settings(KATMAN, ayar, True)
+    except Exception:
+        cl.create_input(SAHNE, KATMAN, "browser_source", ayar, False)
+        time.sleep(0.5)
+        _sigdir(cl, KATMAN)
+    ogeler = cl.get_scene_item_list(SAHNE).scene_items
+    cl.set_scene_item_index(SAHNE, _oge(cl, KATMAN), len(ogeler) - 1)
+
+
+def katman_goster(cl, acik):
+    cl.set_scene_item_enabled(SAHNE, _oge(cl, KATMAN), bool(acik))
+
+
+def ekran_goster(cl, acik):
+    """Yayinda uzaktan oynatma kapaninca masaustu izleyiciye gorunmesin: ekran yakalamayi gizle."""
+    cl.set_scene_item_enabled(SAHNE, _oge(cl, GORUNTU), bool(acik))
+
+
+def yayinda_mi(cl):
+    return bool(cl.get_stream_status().output_active)
 
 
 def _kanallar(acik):
