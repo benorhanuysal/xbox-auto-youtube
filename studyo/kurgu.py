@@ -48,29 +48,16 @@ def _calistir(komut, klasor):
         raise RuntimeError("ffmpeg hatasi:\n" + r.stderr[-2000:])
 
 
-def _bulaniklastir(kutu, araliklar):
-    """[0:v] icinde kutu ([x, y, g, y] 1920x1080 olcusunde) araliklarda (parca basina gore sn) bulaniklasir.
-    Donus: (on_filtre, giris_etiketi). Oranli: kayit baska cozunurlukte olsa da ayni yere denk gelir."""
-    if not kutu or not araliklar:
-        return "", "[0:v]"
-    x, y, g, h = kutu
-    zaman = "+".join("between(t,%.2f,%.2f)" % (b, s) for b, s in araliklar)
-    return ("[0:v]split[bk0][bk1];[bk1]crop=iw*%d/1920:ih*%d/1080:iw*%d/1920:ih*%d/1080,boxblur=24:3[bkb];"
-            "[bk0][bkb]overlay=x=W*%d/1920:y=H*%d/1080:enable='%s'[bkv];" % (g, h, x, y, x, y, zaman)), "[bkv]"
-
-
-def sahne_isle(kaynak, bas, son, cikti, bicim, satirlar, baslik=None, altyazi_gom=True, bulanik=None):
-    """Kaynaktan [bas, son] araligini isleyip cikti dosyasina yazar.
-    bulanik: (kutu, [(bas, son) parcaya gore sn]) -> o alan o araliklarda bulaniklasir (yalniz yatay)."""
+def sahne_isle(kaynak, bas, son, cikti, bicim, satirlar, baslik=None, altyazi_gom=True):
+    """Kaynaktan [bas, son] araligini isleyip cikti dosyasina yazar."""
     klasor = os.path.dirname(os.path.abspath(cikti))
     sure = son - bas
-    on_filtre, giris = _bulaniklastir(*(bulanik or (None, None))) if bicim != "dikey" else ("", "[0:v]")
     if bicim == "dikey":
         # 9:16 tam ekran: oyunun ortasindan (karakter genelde ortada) dikey kirp, buyutup hafif keskinlestir
         goruntu = ("[0:v]crop=trunc(ih*9/16/2)*2:ih:(iw-ow)/2:0,scale=1080:1920:flags=lanczos,"
                    "unsharp=5:5:0.5:5:5:0,fps=60,setsar=1")
     else:
-        goruntu = (on_filtre + giris + "scale=1920:1080:force_original_aspect_ratio=decrease,"
+        goruntu = ("[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,"
                    "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,fps=60,setsar=1")
     sahne_satirlari = altyazi.kes(satirlar, bas, son) if altyazi_gom else []
     if sahne_satirlari or baslik:
@@ -167,10 +154,8 @@ def siyahi_kirp(kaynak, bas, son, bakis=8.0):
     return bas, son
 
 
-def video_yap(kaynak, parcalar, cikti, bicim, satirlar, baslik=None, altyazi_gom=True, gunluk=print,
-              bulanik_kutu=None, bulanik_araliklar=()):
+def video_yap(kaynak, parcalar, cikti, bicim, satirlar, baslik=None, altyazi_gom=True, gunluk=print):
     """parcalar: [[bas, son], ...] -> tek video.
-    bulanik_araliklar: kayit saniyesi olarak; parcaya dusen kismi bulanik_kutu alaninda bulaniklasir.
     Donus: videoya giren parcalar [(plandaki_sira, bas, son), ...] (siyahi kirpilmis gercek sinirlar):
     bolum zamanlari ve altyazi dosyalari bunlara gore hesaplanir."""
     klasor = os.path.dirname(os.path.abspath(cikti))
@@ -186,9 +171,7 @@ def video_yap(kaynak, parcalar, cikti, bicim, satirlar, baslik=None, altyazi_gom
         bas, son = yeni
         gunluk("    sahne %d/%d (%.0f-%.0f sn)" % (i, len(parcalar), bas, son))
         p = os.path.join(klasor, "_%s_%03d.mp4" % (ad, i))
-        icerde = [(max(b, bas) - bas, min(s, son) - bas) for b, s in bulanik_araliklar if b < son and s > bas]
-        sahne_isle(kaynak, bas, son, p, bicim, satirlar, baslik, altyazi_gom,
-                   (bulanik_kutu, icerde) if bulanik_kutu and icerde else None)
+        sahne_isle(kaynak, bas, son, p, bicim, satirlar, baslik, altyazi_gom)
         ara.append(p)
         giren.append((i - 1, bas, son))
     birlestir(ara, cikti)

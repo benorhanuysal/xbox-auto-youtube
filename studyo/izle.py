@@ -4,9 +4,9 @@
 - Kayit durunca (otomatik ya da elle) kurguyu baslatir; bitince Windows bildirimi gelir.
 - Isaret: klavyede F9 ya da kumandada iki analog cubuga birlikte basmak o ani isaretler;
   isaretli anlar videoya mutlaka girer.
-- Kick yayini: uzaktan oynatma acikken Telegram kumandasindan (studyo/telegram.py) acilir/kapanir. Yayinda Turkce
-  altyazi katmani goruntude olur, bildirimler ekran yerine yalniz telefona gider, oynatma kesilince ekran gizlenir,
-  oturum bitince yayin kapanir.
+- Kick yayini: uzaktan oynatma acikken Telegram kumandasindan (studyo/telegram.py) acilir/kapanir. Yayin AYRI
+  ikinci OBS'ten (altyazi + chat + bildirimler onda); kayit OBS'i ayni anda temiz kayit alir. Yayinda bildirimler
+  ekran yerine yalniz telefona gider, oynatma kesilince ekran gizlenir, oturum bitince yayin ve ikinci OBS kapanir.
 - Telegram: isaretle, yayin ac/kapa, durum, mikrofon dugmeleri; bekcinin tum bildirimleri telefona da gelir.
 
   python -m studyo.izle            bekciyi calistir (pencere kapaninca durur)
@@ -219,6 +219,9 @@ def kurgu_isci(ayar, is_kuyrugu):
                 time.sleep(20)
         try:
             time.sleep(5)  # OBS dosyayi kapatsin
+            if not os.path.exists(yol):
+                log.info("kayit dosyasi yok (silinmis), kurgu atlandi: %s", yol)
+                continue
             sure = kayit.sure(yol)
             if sure < ayar["en_kisa_kayit_dk"] * 60:
                 log.info("kisa kayit, kurgu yapilmadi: %s (%.1f dk)", yol, sure / 60)
@@ -301,13 +304,38 @@ class Bekci:
         self.kayitta = False
         self.xbox_kaydi = False   # suren kayit Xbox sahnesinde mi (SCUM vb. elle kayitlar kurguya girmesin)
         self.kuyruk = queue.Queue()
-        self.istekler = queue.Queue()  # tus dinleyiciden: "yayin"
+        self.istekler = queue.Queue()  # tus dinleyiciden / Telegram'dan
+        self.cl2 = None           # YAYIN OBS'i (ikinci, tasinabilir); self.cl kayit OBS'i
         self.yayinda = False
         self.yayin_oto = False    # yayini biz mi actik (oturum bitince biz kapatiriz)
         self.ekran_gizli = False
-        self.ertelenen = None     # yayin surerken kayit biterse sahne geri yuklemesi yayin sonuna kalir
         self.yayin_istendi = None # start_stream zamani: yayin bu surede baslamazsa haber ver
         self.son_on_plan = None
+
+    def _yayin_baglanti(self, bekle=0):
+        """Yayin OBS'i. bekle > 0: kapaliysa acar ve hazir olana kadar bekler."""
+        if self.cl2 is not None:
+            try:
+                self.cl2.get_version()
+                return self.cl2
+            except Exception:
+                self.cl2 = None
+        if not bekle and not obs.calisiyor_mu(obs.YAYIN):
+            return None
+        try:
+            self.cl2 = yayin.yayin_obs(bekle) if bekle else obs.baglan(0, obs.YAYIN)
+        except Exception as e:
+            # Kapanirken/acilirken birkac tur baglanamamak olagan; yalniz acmaya calisirken onemli
+            (log.warning if bekle else log.debug)("yayin OBS'ine baglanilamadi: %s", e)
+            self.cl2 = None
+        return self.cl2
+
+    def _yayin_obs_kapat(self):
+        """Yayin bitince ikinci OBS kapanir (ekrani yakalayip GPU'da cizmeye devam etmesin)."""
+        self.cl2 = None
+        time.sleep(3)
+        if not obs.kapat(obs.YAYIN):
+            log.warning("yayin OBS'i kapanmadi")
 
     def _baglanti(self, bekle=0):
         if self.cl is not None:
@@ -358,10 +386,7 @@ class Bekci:
     def _kayit_bitti(self, cl):
         """Kayit durdu (otomatik ya da elle): ayarlari geri yukle, kurguyu kuyruga ekle."""
         if self.oto:
-            if self.yayinda:
-                self.ertelenen = self.onceki  # sahne simdi degisirse yayinda baska sahne gorunur
-            else:
-                obs.geri_yukle(cl, self.onceki)
+            obs.geri_yukle(cl, self.onceki)
         xbox_kaydi = self.xbox_kaydi
         self.oto, self.onceki, self.xbox_kaydi = False, None, False
         if not self.ayar["oto_kurgu"] or not xbox_kaydi:
@@ -376,70 +401,81 @@ class Bekci:
 
     # ------------------------------------------------------------ Kick yayini
     def yayin_ac(self, aktif):
-        """Donus: kullaniciya (Telegram) gidecek kisa metin."""
-        cl = self._baglanti()
-        if cl is not None and obs.yayinda_mi(cl):
+        """Donus: kullaniciya (Telegram) gidecek kisa metin. Yayin ikinci OBS'ten; kayit OBS'i ayni anda temiz
+        kayit alir (YouTube'a chat/canli altyazi girmez)."""
+        cl2 = self._yayin_baglanti()
+        if cl2 is not None and obs.yayinda_mi(cl2):
             return "Zaten yayındasın 🔴"
         if not aktif:
             _bip("hata")
             return "Yayın açılmadı: önce Xbox uzaktan oynatmayı aç. Oyun ekranı yokken yayın açılmaz (masaüstü görünmesin)."
+        if not yayin.kurulu_mu():
+            _bip("hata")
+            return "Yayın OBS'i kurulu değil: python -m studyo.yayin --ikinci-obs"
         SESSIZ.set()  # "Kayit basladi" bildirimi de ekrana dusmesin
         if not self.kayitta:
-            self.kayit_baslat()  # sahneyi (goruntu, Xbox sesi, mikrofon) kurar; yayinin kaydi da olsun
-        cl = self._baglanti()
-        if cl is None or not yayin.ayarli_mi(cl):
+            self.kayit_baslat()  # temiz kayit (YouTube)
+        cl2 = self._yayin_baglanti(bekle=90)
+        if cl2 is None or not yayin.ayarli_mi(cl2):
             SESSIZ.clear()
             _bip("hata")
-            return "Kick ayarlı değil: YAYIN_KUR.bat ile yayın adresini ve anahtarını gir."
-        cl.set_current_program_scene(obs.SAHNE)
-        obs.ekran_goster(cl, True)
-        obs.katman_goster(cl, True)
-        cl.start_stream()
+            return ("Yayın OBS'i açılamadı." if cl2 is None else
+                    "Kick ayarlı değil: YAYIN_KUR.bat ile yayın adresini ve anahtarını gir.")
+        yayin.hazirla(cl2, self.ayar)  # sahne + altyazi + chat + bildirimler, ekran acik
+        self.ekran_gizli = False
+        cl2.start_stream()
         self.yayin_oto, self.yayin_istendi = True, time.time()
         log.info("yayin baslatiliyor")
         _bip("ac")
         return "Yayın başlatılıyor... Kick'e bağlanınca haber vereceğim."
 
     def yayin_kapa(self):
-        cl = self._baglanti()
-        if cl is None or not obs.yayinda_mi(cl):
+        cl2 = self._yayin_baglanti()
+        if cl2 is None or not obs.yayinda_mi(cl2):
             return "Zaten yayında değilsin."
-        cl.stop_stream()
+        cl2.stop_stream()
         log.info("yayin kapatiliyor")
         _bip("kapa")
         return "⏹ Yayın kapatılıyor."
 
     def yayin_ac_kapa(self, aktif):
         """Klavye tusu (yayin_tusu ayarliysa)."""
-        cl = self._baglanti()
-        log.info(self.yayin_kapa() if cl is not None and obs.yayinda_mi(cl) else self.yayin_ac(aktif))
+        cl2 = self._yayin_baglanti()
+        log.info(self.yayin_kapa() if cl2 is not None and obs.yayinda_mi(cl2) else self.yayin_ac(aktif))
 
     def mikrofon_degistir(self):
-        cl = self._baglanti()
-        if cl is None:
+        """Iki OBS'te birlikte: kayitta ve yayinda ayni durum."""
+        hedefler = [c for c in (self._baglanti(), self._yayin_baglanti()) if c is not None]
+        if not hedefler:
             return "OBS kapalı; mikrofon kayıt başlayınca açılır."
         try:
-            sessiz = not cl.get_input_mute(obs.MIKROFON).input_muted
-            cl.set_input_mute(obs.MIKROFON, sessiz)
+            sessiz = not hedefler[0].get_input_mute(obs.MIKROFON).input_muted
         except Exception:
             return "OBS'te mikrofon kaynağı yok (ilk otomatik kayıtta kurulur)."
+        for c in hedefler:
+            try:
+                c.set_input_mute(obs.MIKROFON, sessiz)
+            except Exception:
+                pass
         log.info("mikrofon %s (telegram)", "kapatildi" if sessiz else "acildi")
         return "🎙 Mikrofon KAPALI 🔇" if sessiz else "🎙 Mikrofon AÇIK"
 
     def durum_metni(self, aktif):
         satirlar = ["🎮 Uzaktan oynatma: %s" % ("açık" if aktif else "kapalı")]
-        cl = self._baglanti()
-        if cl is None:
-            satirlar.append("OBS: kapalı")
-        else:
-            try:
+        cl, cl2 = self._baglanti(), self._yayin_baglanti()
+        try:
+            if cl is None:
+                satirlar.append("⏺ Kayıt: yok (OBS kapalı)")
+            else:
                 k = cl.get_record_status()
                 satirlar.append("⏺ Kayıt: %s" % ("sürüyor (%d dk)" % (k.output_duration / 60000) if k.output_active else "yok"))
-                y = cl.get_stream_status()
-                satirlar.append("🔴 Yayın: %s" % ("AÇIK (%d dk)" % (y.output_duration / 60000) if y.output_active else "kapalı"))
-                satirlar.append("🎙 Mikrofon: %s" % ("kapalı 🔇" if cl.get_input_mute(obs.MIKROFON).input_muted else "açık"))
-            except Exception as e:
-                satirlar.append("OBS: %s" % str(e)[:80])
+            y = cl2.get_stream_status() if cl2 is not None else None
+            satirlar.append("🔴 Yayın: %s" % ("AÇIK (%d dk)" % (y.output_duration / 60000) if y and y.output_active else "kapalı"))
+            if cl or cl2:
+                sessiz = (cl or cl2).get_input_mute(obs.MIKROFON).input_muted
+                satirlar.append("🎙 Mikrofon: %s" % ("kapalı 🔇" if sessiz else "açık"))
+        except Exception as e:
+            satirlar.append("OBS: %s" % str(e)[:80])
         satirlar.append("🈯 Luna (altyazı): %s" % ("açık" if luna_acik_mi() else "kapalı"))
         if self.kuyruk.qsize():
             satirlar.append("🎬 Kurgu kuyruğu: %d kayıt" % self.kuyruk.qsize())
@@ -467,57 +503,48 @@ class Bekci:
             cevap = telegram.YARDIM
         telegram.gonder(cevap)
 
-    def _yayin_degisti(self, cl, yayinda):
+    def _yayin_degisti(self, yayinda):
         self.yayinda = yayinda
-        yayin.olay_yaz("BASLA" if yayinda else "BITTI")
         yayin.bayrak(yayinda)
         log.info("yayin %s", "basladi" if yayinda else "bitti")
-        try:
-            obs.katman_goster(cl, yayinda)
-        except Exception as e:
-            log.warning("altyazi katmani ayarlanamadi: %s", e)
         if yayinda:
             SESSIZ.set()
             self.yayin_istendi = None
-            bildirim("🔴 Yayın başladı", "Kick'te canlısın, Türkçe altyazı katmanı açık.")
+            bildirim("🔴 Yayın başladı", "Kick'te canlısın: Türkçe altyazı, chat ve bildirimler açık. Kayıt temiz.")
             return
         SESSIZ.clear()
-        self.yayin_oto = False
-        if self.ekran_gizli:
-            obs.ekran_goster(cl, True)
-            self.ekran_gizli = False
-        if self.ertelenen is not None:
-            obs.geri_yukle(cl, self.ertelenen)
-            self.ertelenen = None
+        self.yayin_oto, self.ekran_gizli = False, False
         bildirim("Yayin bitti", "Kick yayini kapandi.")
+        threading.Thread(target=self._yayin_obs_kapat, daemon=True).start()
 
-    def _yayin_turu(self, cl, simdi, oturum_bitti):
+    def _yayin_turu(self, cl2, simdi, oturum_bitti):
+        if cl2 is None:
+            if self.yayinda:  # yayin OBS'i kapandi/coktu
+                self._yayin_degisti(False)
+            return
         try:
-            yayinda = obs.yayinda_mi(cl)
+            yayinda = obs.yayinda_mi(cl2)
         except Exception:
             return
         if yayinda != self.yayinda:
-            self._yayin_degisti(cl, yayinda)
+            self._yayin_degisti(yayinda)
         if not yayinda:
             if self.yayin_istendi and simdi - self.yayin_istendi > 30:
                 self.yayin_istendi, self.yayin_oto = None, False
                 SESSIZ.clear()
-                try:
-                    obs.katman_goster(cl, False)
-                except Exception:
-                    pass
                 bildirim("Yayın başlamadı", "OBS 30 sn'de Kick'e bağlanamadı (anahtar ya da internet). Tekrar dene.")
+                threading.Thread(target=self._yayin_obs_kapat, daemon=True).start()
             return
         gizle = simdi - self.son_aktif >= self.ayar["yayin_ekran_gizle_sn"]
         if gizle != self.ekran_gizli:
             try:
-                obs.ekran_goster(cl, not gizle)
+                obs.ekran_goster(cl2, not gizle)
                 self.ekran_gizli = gizle
                 log.info("yayinda ekran %s", "gizlendi (uzaktan oynatma kesildi)" if gizle else "geri acildi")
             except Exception as e:
                 log.warning("ekran gizlenemedi: %s", e)
         if self.yayin_oto and oturum_bitti:
-            cl.stop_stream()
+            cl2.stop_stream()
             log.info("yayin kapatiliyor (uzaktan oynatma bitti)")
 
     def tur(self):
@@ -558,8 +585,7 @@ class Bekci:
                 self.elle_durdu = True  # oynarken elle durduruldu
             self._kayit_bitti(cl)
         self.kayitta = kayitta
-        if cl is not None:
-            self._yayin_turu(cl, simdi, oturum_bitti)
+        self._yayin_turu(self._yayin_baglanti(), simdi, oturum_bitti)
         if kayitta or self.yayinda:
             try:
                 pencere = on_plan()
@@ -579,7 +605,6 @@ class Bekci:
 
     def calis(self):
         durdur = threading.Event()
-        yayin.acik_kalani_kapat()
         yayin.bayrak(False)  # onceki calismadan kalmissa; yayin suruyorsa ilk tur yeniden koyar
         threading.Thread(target=isaret_dinle, args=(self.ayar, durdur, self.istekler), daemon=True).start()
         threading.Thread(target=kurgu_isci, args=(self.ayar, self.kuyruk), daemon=True).start()
