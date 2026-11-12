@@ -190,6 +190,11 @@ def _python_exe():
 def kurgu_isci(ayar, is_kuyrugu):
     while True:
         yol = is_kuyrugu.get()
+        if SESSIZ.is_set():
+            # Yayin suruyor: kurgu GPU kodlayicisini ve (yuklemede) upload'u yayinla paylasmasin
+            log.info("yayin suruyor, kurgu yayin bitince yapilacak: %s", os.path.basename(yol))
+            while SESSIZ.is_set():
+                time.sleep(20)
         try:
             time.sleep(5)  # OBS dosyayi kapatsin
             sure = kayit.sure(yol)
@@ -442,6 +447,7 @@ class Bekci:
     def _yayin_degisti(self, cl, yayinda):
         self.yayinda = yayinda
         yayin.olay_yaz("BASLA" if yayinda else "BITTI")
+        yayin.bayrak(yayinda)
         log.info("yayin %s", "basladi" if yayinda else "bitti")
         try:
             obs.katman_goster(cl, yayinda)
@@ -543,6 +549,7 @@ class Bekci:
     def calis(self):
         durdur = threading.Event()
         yayin.acik_kalani_kapat()
+        yayin.bayrak(False)  # onceki calismadan kalmissa; yayin suruyorsa ilk tur yeniden koyar
         threading.Thread(target=isaret_dinle, args=(self.ayar, durdur, self.istekler), daemon=True).start()
         threading.Thread(target=kurgu_isci, args=(self.ayar, self.kuyruk), daemon=True).start()
         threading.Thread(target=youtube_isci, args=(self.ayar, durdur), daemon=True).start()

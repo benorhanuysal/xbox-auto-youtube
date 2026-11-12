@@ -94,7 +94,9 @@ Konuştuğun anlar aday sahne olur ve öne çıkar, Claude yorumu ortadan kesmez
 Belirli bir kayıt için: `YAP.bat "D:\Kayitlar\2026-11-12 21-30-05.mkv"`. Sadece planı görmek için: `YAP.bat --sadece-plan`. Tek bir planlayıcı için: `YAP.bat --planlayici gemini` (`claude` / `gemini` / `yok`).
 
 ## Kick'te canlı yayın (Türkçe altyazılı)
-Kurulum (bir kez): **`YAYIN_KUR.bat`** → Kick'te *Yayıncı Paneli (Creator Dashboard) → Stream URL and Key*'den adresi ve anahtarı yapıştır (anahtar ekranda görünmez, yalnız OBS'in kendi ayarına yazılır). Ya da adres + `key: ...` satırlı bir metin dosyasından: `python -m studyo.yayin --kur --dosya kick.txt`. OBS 1080p60, NVENC, CBR **6000 kbps**, 2 sn anahtar kare olarak ayarlanır. Kick API'si / Geliştirici Modu gerekmez.
+Kurulum (bir kez): **`YAYIN_KUR.bat`** → Kick'te *Yayıncı Paneli (Creator Dashboard) → Stream URL and Key*'den adresi ve anahtarı yapıştır (anahtar ekranda görünmez, yalnız OBS'in kendi ayarına yazılır). Ya da adres + `key: ...` satırlı bir metin dosyasından: `python -m studyo.yayin --kur --dosya kick.txt`. OBS 1080p60, NVENC **p6**, CBR **7800 kbps** (Kick sınırı 8000), 2 sn anahtar kare olarak ayarlanır. Kick API'si / Geliştirici Modu gerekmez.
+
+Kalite ve akıcılık: 4K ekran 1080p'ye **Lanczos** ile küçültülür (sahnedeki "Xbox goruntu" öğesi; OBS kapalıyken sahne dosyasında `scale_filter`). Ölçüm (RTX 2070, en kötü görüntü olan tam ekran parazitle kayıt + yayın aynı anda): kodlayıcı gecikmesi 0 kare, çizim 0,5 ms/kare, işlemci %2, ağda atlanan kare 0. Yayın sürerken kurgu ve YouTube yüklemesi bekletilir (GPU'yu ve upload'u yayınla paylaşmasınlar), yayın bitince kendiliğinden devam eder. Görüntüdeki takılmaların kaynağı en çok uzaktan oynatmanın kendisidir: Xbox'ı kabloyla (Ethernet) bağla, yayında indirme (Steam, Windows Update) olmasın.
 
 Oynarken: uzaktan oynatma açıkken **Telegram kumandasından** 🔴 *Yayını başlat* (PC'den yükselen üç bip; Kick'e bağlanınca telefona "Yayın başladı" gelir), ⏹ *Yayını bitir*. Kayıt da açılır; yayının videosu da YouTube kurgusuna girer. OBS 30 sn'de Kick'e bağlanamazsa telefona haber gelir.
 

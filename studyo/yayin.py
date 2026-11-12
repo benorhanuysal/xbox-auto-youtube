@@ -19,6 +19,29 @@ from . import ayar as ayar_modulu, obs
 
 KOK = ayar_modulu.KOK
 ARALIKLAR = os.path.join(KOK, "yayin_araliklari.txt")
+# Bekci yayin surerken bu dosyayi tutar; kurgu sureci (ayri program) YouTube yuklemesini yayin bitene dek erteler:
+# yukleme upload hizini yayinla paylasirsa Kick'te donma olur
+BAYRAK = os.path.join(KOK, ".yayinda")
+
+
+def bayrak(acik):
+    try:
+        if acik:
+            open(BAYRAK, "w").close()
+        elif os.path.exists(BAYRAK):
+            os.remove(BAYRAK)
+    except OSError:
+        pass
+
+
+def bitmesini_bekle(gunluk=print, en_fazla_sn=6 * 3600):
+    """Yayin suruyorsa bitene kadar (en fazla 6 saat) bekler."""
+    if not os.path.exists(BAYRAK):
+        return
+    gunluk("  Kick yayini suruyor: YouTube yuklemesi yayin bitince yapilacak (upload yayina kalsin)")
+    bitis = time.time() + en_fazla_sn
+    while os.path.exists(BAYRAK) and time.time() < bitis:
+        time.sleep(30)
 PAY_SN = 10  # katman acilip kapanirken ekranda kalan altyazi payi
 
 
@@ -93,6 +116,15 @@ def _deger(yanit, ad):
     return getattr(yanit, ad, None)
 
 
+def kalite_ayarla(cl, ayar):
+    """Basit cikti yayin kodlayicisi: NVENC, CBR (Basit modda sabit), 2 sn anahtar kare (Basit mod varsayilani).
+    Yayin/kayit surerken degisiklik bir sonraki baslatmada gecerli olur."""
+    cl.set_profile_parameter("SimpleOutput", "StreamEncoder", "nvenc")
+    cl.set_profile_parameter("SimpleOutput", "VBitrate", str(ayar["yayin_bit_hizi"]))
+    cl.set_profile_parameter("SimpleOutput", "ABitrate", "160")
+    cl.set_profile_parameter("SimpleOutput", "NVENCPreset2", ayar["yayin_on_ayar"])
+
+
 def _obs(ayar):
     if not obs.calisiyor_mu():
         obs.ws_ac()
@@ -148,11 +180,9 @@ def kur(dosya=None):
     cl.set_stream_service_settings("rtmp_custom", {"server": adres, "key": anahtar, "use_auth": False,
                                                    "bwtest": False})
     # Basit cikti: NVENC, CBR; anahtar kare araligi 2 sn (Kick'in istedigi)
-    cl.set_profile_parameter("SimpleOutput", "StreamEncoder", "nvenc")
-    cl.set_profile_parameter("SimpleOutput", "VBitrate", str(ayar["yayin_bit_hizi"]))
-    cl.set_profile_parameter("SimpleOutput", "ABitrate", "160")
+    kalite_ayarla(cl, ayar)
     obs.xbox_sahnesi(cl)
-    print("\n[OK] OBS Kick'e ayarlandi (%d kbps, 1080p60)." % ayar["yayin_bit_hizi"])
+    print("\n[OK] OBS Kick'e ayarlandi (%d kbps, NVENC %s, 1080p60)." % (ayar["yayin_bit_hizi"], ayar["yayin_on_ayar"]))
     print("     Oynarken yayini ac/kapat: Telegram kumandasi%s (uzaktan oynatma acikken)." % (
         " ya da klavyede " + ayar["yayin_tusu"] if ayar.get("yayin_tusu") else ""))
     return 0

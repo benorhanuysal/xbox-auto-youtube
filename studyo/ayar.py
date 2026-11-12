@@ -81,7 +81,8 @@ VARSAYILAN = {
     # Yayin Telegram kumandasindan acilir/kapanir (python -m studyo.telegram --kur). Klavye tusu istenirse
     # "F10" gibi bir tus yaz; bos = kapali. Oynatma kapaninca yayin her durumda kendiliginden biter.
     "yayin_tusu": "",
-    "yayin_bit_hizi": 6000,   # kbps; Kick en fazla 8000, 1080p60 icin 6000 yeterli
+    "yayin_bit_hizi": 7800,   # kbps; Kick en fazla 8000 (ses 160 ile toplam ~7960). Upload >= 12 Mbit olmali
+    "yayin_on_ayar": "p6",    # NVENC: p5 hizli, p6 daha temiz (oyun Xbox'ta, PC'nin GPU'su bos), p7 en yavas
     # Yayindayken uzaktan oynatma bu kadar sn kesilirse ekran gizlenir (masaustu izleyiciye gorunmesin)
     "yayin_ekran_gizle_sn": 4,
     "obs_exe": r"C:\Program Files\obs-studio\bin\64bit\obs64.exe",

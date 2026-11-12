@@ -286,6 +286,7 @@ def main():
             if meta.get("baslik_en"):
                 f.write("ENGLISH TITLE:\n%s\n\nENGLISH DESCRIPTION:\n%s\n\n" % (meta["baslik_en"] + ek, _aciklama(meta, ayar, "en")))
     if (ayar["youtube_yukle"] or arg.youtube_guncelle) and videolar:
+        yayin.bitmesini_bekle(_yaz)
         _youtube_yukle(videolar, ayar, cikti, yol, arg.youtube_guncelle)
 
     _yaz("Bitti (%.1f dk): %s" % ((time.time() - t0) / 60, cikti))
