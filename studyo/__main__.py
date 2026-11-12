@@ -3,11 +3,14 @@
   python -m studyo "kayit.mkv"     belirli bir kaydi isle
   python -m studyo --sadece-plan   video uretmeden plani goster
   python -m studyo --planlayici gemini   yalnizca Gemini ile planla (claude / gemini / yok)
+  python -m studyo "kayit.mkv" --plani-kullan --youtube-guncelle
+                                   kayitli planla yeniden kurgula, YouTube'daki videolari (yeniden yuklemeden) guncelle
 """
 import argparse
 import datetime
 import json
 import os
+import re
 import sys
 import time
 
@@ -18,43 +21,149 @@ def _yaz(metin):
     print(metin, flush=True)
 
 
-def _aciklama(meta, ayar):
-    alt = ("\n\n🎮 %s · Türkçe altyazılı oynanış\n🤖 Altyazılar yapay zekâ ile canlı çevrildi. Sistem açık kaynak: %s\n\n#%s #türkçealtyazı #gaming"
-           % (ayar["oyun"], ayar["kanal_linki"], ayar["oyun"].replace(" ", "")))
-    return (meta.get("aciklama") or "").strip() + alt
+def _aciklama(meta, ayar, dil="tr"):
+    oyun_etiketi = ayar["oyun"].replace(" ", "")
+    if dil == "en":
+        metin = (meta.get("aciklama_en") or "").strip()
+        bolum_basligi = "Chapters:"
+        alt = ("\n\n🎮 %s · gameplay with live AI-translated Turkish subtitles\n🤖 Open-source system: %s\n\n#%s #gaming"
+               % (ayar["oyun"], ayar["kanal_linki"], oyun_etiketi))
+    else:
+        metin = (meta.get("aciklama") or "").strip()
+        bolum_basligi = "Bölümler:"
+        alt = ("\n\n🎮 %s · Türkçe altyazılı oynanış\n🤖 Altyazılar yapay zekâ ile canlı çevrildi. Sistem açık kaynak: %s\n\n#%s #türkçealtyazı #gaming"
+               % (ayar["oyun"], ayar["kanal_linki"], oyun_etiketi))
+    if meta.get("_bolumler") and ayar["youtube_bolumler"]:
+        metin += "\n\n%s\n%s" % (bolum_basligi, meta["_bolumler"])
+    return metin + alt
 
 
-def _youtube_yukle(videolar, ayar, cikti):
-    """Her videoyu ayri dene: biri basarisiz olursa digerleri yine yuklensin. Linkler youtube_linkleri.txt'ye."""
+def _mevcut_videolar(cikti):
+    """Bu cikti klasorunden daha once yuklenen videolar: {etiket: video_id} (youtube_durum.json, yoksa link dosyasi)."""
+    from . import youtube
+    sonuc = {v["etiket"]: v["id"] for v in youtube.durum_oku()["videolar"]
+             if os.path.normcase(v.get("cikti", "")) == os.path.normcase(cikti) and v.get("etiket")}
+    yol = os.path.join(cikti, "youtube_linkleri.txt")
+    if os.path.exists(yol):
+        with open(yol, encoding="utf-8") as f:
+            for etiket, vid in re.findall(r"^(UZUN VIDEO|SHORTS \d+):.*\n\s*https://youtu\.be/([\w-]+)", f.read(), re.M):
+                sonuc.setdefault(etiket, vid)
+    return sonuc
+
+
+def _youtube_yukle(videolar, ayar, cikti, kayit_yolu, guncelle=False):
+    """Her videoyu ayri dene: biri basarisiz olursa digerleri yine yuklensin.
+    guncelle=True: daha once yuklenmis videolar yeniden yuklenmez, bilgileri/altyazilari/listeleri tamamlanir."""
     from . import youtube
     from .izle import bildirim
     gizlilik = ayar["youtube_gizlilik"]
-    _yaz("6/6 YouTube'a yukleme (%s)" % gizlilik)
-    linkler, hatalar = [], []
+    _yaz("6/6 YouTube (%s%s)" % ("guncelleme" if guncelle else gizlilik, ", zamanli" if ayar["youtube_zamanla"] else ""))
+    mevcut = _mevcut_videolar(cikti) if guncelle else {}
+    tam_izin = youtube.tam_izin_var_mi()
+    if not tam_izin:
+        _yaz("  [!] Yeni izin verilmemis: altyazi parcasi ve oynatma listesi atlanacak (python -m studyo.youtube --kur)")
+    linkler, hatalar, shorts_sira = [], [], 0
     for etiket, dosya, meta in videolar:
-        baslik = meta["baslik"] + (" #Shorts" if etiket.startswith("SHORTS") else "")
-        kapak = os.path.join(cikti, "uzun_kapak.jpg") if etiket == "UZUN VIDEO" else None
+        tur = "shorts" if etiket.startswith("SHORTS") else "uzun"
+        ek = " #Shorts" if tur == "shorts" else ""
+        baslik = meta["baslik"] + ek
+        yerel = None
+        if ayar["youtube_ingilizce"] and meta.get("baslik_en"):
+            yerel = {"en": {"title": meta["baslik_en"] + ek, "description": _aciklama(meta, ayar, "en")}}
+        yayin = None
+        if ayar["youtube_zamanla"] and not guncelle:
+            if tur == "uzun":
+                yayin = youtube.yayin_zamani(ayar["youtube_uzun_saat"], 1)
+            else:
+                shorts_sira += 1
+                yayin = youtube.yayin_zamani(ayar["youtube_shorts_saat"], shorts_sira)
         _yaz("  %s: %s" % (etiket, baslik))
         try:
-            link = youtube.yukle(dosya, baslik, _aciklama(meta, ayar), meta["etiketler"], gizlilik, kapak, _yaz)
+            if etiket in mevcut:
+                vid = mevcut[etiket]
+                if tam_izin:
+                    youtube.guncelle(vid, baslik, _aciklama(meta, ayar), meta["etiketler"], yerel)
+                    _yaz("    bilgiler guncellendi (bolumler, Ingilizce baslik)")
+            else:
+                kapak = os.path.join(cikti, "uzun_kapak.jpg") if tur == "uzun" else None
+                vid = youtube.yukle(dosya, baslik, _aciklama(meta, ayar), meta["etiketler"], gizlilik, kapak, _yaz,
+                                    yerel, yayin)
+                if yayin:
+                    _yaz("    yayin zamani: %s (UTC)" % yayin)
         except youtube.GirisGerekli as e:
             hatalar.append(str(e))
             break  # diger videolar da ayni sebeple yuklenemez
         except Exception as e:
             hatalar.append("%s: %s" % (etiket, str(e)[:200]))
             continue
+        link = "https://youtu.be/" + vid
         _yaz("    " + link)
         linkler.append("%s: %s\n  %s" % (etiket, baslik, link))
+        youtube.video_kaydet({"id": vid, "etiket": etiket, "tur": tur, "baslik": meta["baslik"],
+                              "baslik_en": meta.get("baslik_en", ""), "cikti": cikti, "kayit": kayit_yolu,
+                              "sure_sn": meta.get("_sure_sn"), "bolum_sayisi": len(meta.get("_bolum_listesi") or []),
+                              "yukleme": datetime.datetime.now().astimezone().isoformat(timespec="seconds")})
+        if not tam_izin:
+            continue
+        # Oynatma listesi + altyazi parcalari: biri basarisiz olsa da video yuklenmis sayilir
+        try:
+            liste = (ayar["youtube_listeler"].get(tur) or "").format(oyun=ayar["oyun"], kanal=ayar["kanal"])
+            liste_aciklamasi = ayar["youtube_liste_aciklamasi"].format(oyun=ayar["oyun"], kanal=ayar["kanal"])
+            if liste and youtube.listeye_ekle(vid, youtube.liste_kimligi(liste, liste_aciklamasi)):
+                _yaz("    listeye eklendi: %s" % liste)
+        except Exception as e:
+            hatalar.append("%s liste: %s" % (etiket, str(e)[:150]))
+        for dil in ayar["youtube_altyazi_dilleri"].get(tur, []):
+            srt = meta.get("_srt", {}).get(dil)
+            if not srt or not os.path.exists(srt) or os.path.getsize(srt) == 0:
+                continue
+            try:
+                if youtube.altyazi_yukle(vid, srt, dil, "Türkçe" if dil == "tr" else "English"):
+                    _yaz("    altyazi parcasi: %s" % dil)
+            except Exception as e:
+                hatalar.append("%s altyazi %s: %s" % (etiket, dil, str(e)[:150]))
     if linkler:
         with open(os.path.join(cikti, "youtube_linkleri.txt"), "w", encoding="utf-8") as f:
             f.write("\n".join(linkler) + "\n\nStudio: https://studio.youtube.com\n")
     for h in hatalar:
         _yaz("  [HATA] " + h)
-    if linkler:
-        bildirim("YouTube'a yuklendi", "%d video %s yuklendi. Studio'da kontrol edip yayinla." %
-                 (len(linkler), "gizli" if gizlilik == "private" else gizlilik))
+    if linkler and not guncelle:
+        durum = "zamanlandi" if ayar["youtube_zamanla"] else ("gizli yuklendi" if gizlilik == "private" else gizlilik)
+        bildirim("YouTube'a yuklendi", "%d video %s. Studio'da kontrol et." % (len(linkler), durum))
     if hatalar:
-        bildirim("YouTube yuklemesi basarisiz", hatalar[0][:150])
+        bildirim("YouTube: sorun var", hatalar[0][:150])
+
+
+def _kurgu_bilgisi_yaz(cikti, bilgi):
+    with open(os.path.join(cikti, "kurgu.json"), "w", encoding="utf-8") as f:
+        json.dump(bilgi, f, ensure_ascii=False, indent=2)
+
+
+def _kurgu_bilgisi_oku(cikti):
+    try:
+        with open(os.path.join(cikti, "kurgu.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def _videolar_listesi(cikti, plan, bilgi):
+    """(etiket, dosya, meta) listesi; meta'ya bolum metni, altyazi dosyalari ve sure eklenir."""
+    videolar = []
+    adlar = [("UZUN VIDEO", "uzun", plan["uzun"])] + [("SHORTS %d" % i, "short_%d" % i, s)
+                                                      for i, s in enumerate(plan["shorts"], 1)]
+    for etiket, ad, meta in adlar:
+        dosya = os.path.join(cikti, ad + ".mp4")
+        if not os.path.exists(dosya):
+            continue
+        meta = dict(meta)
+        b = bilgi.get(ad, {})
+        meta["_bolum_listesi"] = b.get("bolumler") or []
+        meta["_bolumler"] = kurgu.bolum_metni(meta["_bolum_listesi"]) if meta["_bolum_listesi"] else ""
+        meta["_sure_sn"] = b.get("sure_sn")
+        meta["_srt"] = {dil: os.path.join(cikti, "%s_%s.srt" % (ad, dil)) for dil in ("tr", "en")}
+        videolar.append((etiket, dosya, meta))
+    return videolar
 
 
 def main():
@@ -67,6 +176,8 @@ def main():
                     help="yapay zekaya sormadan cikti klasorundeki plan.json ile yeniden kurgula")
     ap.add_argument("--sadece-yukle", action="store_true",
                     help="kurgulamadan, cikti klasorundeki hazir videolari YouTube'a yukle")
+    ap.add_argument("--youtube-guncelle", action="store_true",
+                    help="daha once yuklenmis videolari yeniden yuklemeden guncelle (bolum, Ingilizce, altyazi, liste)")
     arg = ap.parse_args()
 
     ayar = ayar_modulu.yukle()
@@ -83,9 +194,7 @@ def main():
     if arg.sadece_yukle:
         with open(os.path.join(cikti, "plan.json"), encoding="utf-8") as f:
             plan = json.load(f)["plan"]
-        videolar = [("UZUN VIDEO", os.path.join(cikti, "uzun.mp4"), plan["uzun"])]
-        videolar += [("SHORTS %d" % i, os.path.join(cikti, "short_%d.mp4" % i), s) for i, s in enumerate(plan["shorts"], 1)]
-        _youtube_yukle([v for v in videolar if os.path.exists(v[1])], ayar, cikti)
+        _youtube_yukle(_videolar_listesi(cikti, plan, _kurgu_bilgisi_oku(cikti)), ayar, cikti, yol, arg.youtube_guncelle)
         return
 
     satirlar = altyazi.kayda_esle(ayar["luna_userconfig"], bas, sure, ayar["altyazi_gecikme_sn"])
@@ -106,6 +215,7 @@ def main():
         with open(eski_plan, encoding="utf-8") as f:
             plan = json.load(f)["plan"]
         _yaz("  Kayitli plan kullaniliyor: %s" % eski_plan)
+        plan_modulu.meta_tamamla(plan, satirlar, ayar, cikti, _yaz)
     else:
         plan = plan_modulu.plan(adaylar, ayar, yol, cikti, _yaz, planlayicilar, sure)
     with open(os.path.join(cikti, "plan.json"), "w", encoding="utf-8") as f:
@@ -125,33 +235,47 @@ def main():
 
     ad_kod, _ = kurgu.kodlayici()
     _yaz("4/5 Kurgu (kodlayici: %s)" % ad_kod)
-    videolar = []
+    bilgi = {}
+
+    def _altyazi_dosyalari(ad_, giren):
+        gercek = [(b, s) for _, b, s in giren]
+        zamanli = altyazi.yeniden_zamanla(satirlar, gercek)
+        for dil in ("tr", "en"):
+            altyazi.srt_yaz(zamanli, os.path.join(cikti, "%s_%s.srt" % (ad_, dil)), dil)
+        return sum(s - b for b, s in gercek)
+
     if plan["uzun"]["parcalar"]:
         _yaz("  Uzun video")
         dosya = os.path.join(cikti, "uzun.mp4")
-        kurgu.video_yap(yol, plan["uzun"]["parcalar"], dosya, "yatay", satirlar, None, ayar["altyazi_gom"], _yaz)
+        giren = kurgu.video_yap(yol, plan["uzun"]["parcalar"], dosya, "yatay", satirlar, None, ayar["altyazi_gom"], _yaz)
         # Kapak: en heyecanli secilen sahnenin ortasi
         en_iyi = max(plan["uzun"]["parcalar"], key=lambda p: heyecan[int(p[0]):int(p[1]) + 1].max() if len(heyecan) else 0)
         kurgu.kucuk_resim(yol, (en_iyi[0] + en_iyi[1]) / 2, os.path.join(cikti, "uzun_kapak.jpg"))
-        altyazi.srt_yaz(altyazi.yeniden_zamanla(satirlar, plan["uzun"]["parcalar"]), os.path.join(cikti, "uzun_tr.srt"))
-        videolar.append(("UZUN VIDEO", dosya, plan["uzun"]))
+        bolumler = kurgu.bolum_listesi(giren, plan["uzun"].get("bolumler") or [])
+        bilgi["uzun"] = {"parcalar": giren, "bolumler": bolumler, "sure_sn": _altyazi_dosyalari("uzun", giren)}
+        if bolumler:
+            _yaz("    %d bolum" % len(bolumler))
     for i, s in enumerate(plan["shorts"], 1):
         _yaz("  Shorts %d" % i)
         dosya = os.path.join(cikti, "short_%d.mp4" % i)
-        kurgu.video_yap(yol, s["parcalar"], dosya, "dikey", satirlar, s["baslik"], ayar["altyazi_gom"], _yaz)
-        videolar.append(("SHORTS %d" % i, dosya, s))
+        giren = kurgu.video_yap(yol, s["parcalar"], dosya, "dikey", satirlar, s["baslik"], ayar["altyazi_gom"], _yaz)
+        bilgi["short_%d" % i] = {"parcalar": giren, "sure_sn": _altyazi_dosyalari("short_%d" % i, giren)}
+    _kurgu_bilgisi_yaz(cikti, bilgi)
+    videolar = _videolar_listesi(cikti, plan, bilgi)
 
     _yaz("5/5 Yukleme bilgileri")
     with open(os.path.join(cikti, "yukleme_bilgisi.txt"), "w", encoding="utf-8") as f:
         for etiket, dosya, meta in videolar:
-            baslik = meta["baslik"] + (" #Shorts" if etiket.startswith("SHORTS") else "")
+            ek = " #Shorts" if etiket.startswith("SHORTS") else ""
             f.write("===== %s: %s =====\nBASLIK:\n%s\n\nACIKLAMA:\n%s\n\nETIKETLER:\n%s\n\n"
-                    % (etiket, os.path.basename(dosya), baslik, _aciklama(meta, ayar), ", ".join(meta["etiketler"])))
-    if ayar["youtube_yukle"] and videolar:
-        _youtube_yukle(videolar, ayar, cikti)
+                    % (etiket, os.path.basename(dosya), meta["baslik"] + ek, _aciklama(meta, ayar), ", ".join(meta["etiketler"])))
+            if meta.get("baslik_en"):
+                f.write("ENGLISH TITLE:\n%s\n\nENGLISH DESCRIPTION:\n%s\n\n" % (meta["baslik_en"] + ek, _aciklama(meta, ayar, "en")))
+    if (ayar["youtube_yukle"] or arg.youtube_guncelle) and videolar:
+        _youtube_yukle(videolar, ayar, cikti, yol, arg.youtube_guncelle)
 
     _yaz("Bitti (%.1f dk): %s" % ((time.time() - t0) / 60, cikti))
-    if sys.platform == "win32":
+    if sys.platform == "win32" and not arg.youtube_guncelle:
         os.startfile(cikti)
 
 

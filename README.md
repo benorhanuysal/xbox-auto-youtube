@@ -94,6 +94,23 @@ Kurulum (bir kez, ~5 dk):
 
 İzin geçerli mi: `python -m studyo.youtube --kontrol`. Özel kapak için kanalın telefonla doğrulanmış olması gerekir ([youtube.com/verify](https://www.youtube.com/verify)); değilse video kapaksız yüklenir.
 
+### Her yüklemede otomatik
+| Ne | Nasıl | Ayar |
+|---|---|---|
+| **Bölümler** | Claude her sahneye ad verir; açıklamaya `00:00 ...` listesi yazılır, YouTube oynatma çubuğunda bölüm olarak gösterir (en az 3 bölüm, her biri ≥10 sn; kısa sahne sonrakine katılır). Zamanlar siyahı kırpılmış gerçek sürelerden hesaplanır. | `youtube_bolumler` |
+| **İngilizce başlık/açıklama** | `localizations.en`: dili İngilizce olan izleyici videoyu İngilizce başlıkla görür. | `youtube_ingilizce` |
+| **Altyazı parçaları** | Uzun videoya TR + EN, Shorts'a EN (Türkçesi zaten videonun üstünde). EN, OCR hataları Claude'a düzeltilmiş oyun altyazısıdır. Parça başına 400 kota birimi. | `youtube_altyazi_dilleri` |
+| **Oynatma listeleri** | `{oyun} Türkçe Altyazılı Oynanış` ve `{oyun} Shorts | Türkçe Altyazılı`; yoksa oluşturulur. | `youtube_listeler` |
+| **Zamanlanmış yayın** (kapalı) | Açılırsa uzun video ertesi gün 20:00'de, Shorts sonraki günlerde birer birer 18:00'de kendiliğinden yayına girer. | `youtube_zamanla`, `youtube_uzun_saat`, `youtube_shorts_saat` |
+
+Eski bir kaydın videolarını yeniden yüklemeden tamamlamak: `python -m studyo "kayit.mkv" --plani-kullan --youtube-guncelle`.
+
+### Performans raporu ve öğrenme
+**`RAPOR.bat`** (bekçi haftada bir kendisi de çalıştırır): tüm videoların izlenme/beğeni/yorum sayıları + son 28 günün izlenme süresi, ortalama izlenme yüzdesi, abone ve trafik kaynakları ([YouTube Analytics API](https://console.cloud.google.com/apis/library/youtubeanalytics.googleapis.com) açık olmalı; veriler ~2 gün gecikmeli). Claude veriyi yorumlar: sana Türkçe özet (`cikti/raporlar/rapor_TARIH.md`), kurguya dersler (`ogrenme.json`). Bir sonraki kurguda Claude bu dersleri uygular; toplam izlenme 30'un altındaysa ders çıkarılmaz.
+
+### Yorumlar
+Bekçi 3 saatte bir cevaplanmamış yorumları sayar, varsa bildirim gönderir. **`YORUMLAR.bat`**: Claude her yoruma kısa, samimi bir cevap taslağı yazar (spam ve cevap gerektirmeyenlere yazmaz); **Enter** gönderir, **d** ile kendin yazarsın, **a** atlar. Hiçbir cevap onayın olmadan gitmez.
+
 ## Gizlilik
 `ayarlar.json`, `client_secret.json`, `token.json`, kayıtlar ve `cikti/` git'e girmez (`.gitignore`). Yapay zekâya yalnızca diyalog metni, sahne zamanları ve (Claude'da) sahne kareleri gider; kaydın tamamı gönderilmez.
 

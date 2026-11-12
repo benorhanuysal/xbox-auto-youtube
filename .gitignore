@@ -15,3 +15,6 @@ cikti/
 
 __pycache__/
 *.pyc
+youtube_durum.json
+youtube_durum.json.yeni
+ogrenme.json

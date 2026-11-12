@@ -154,10 +154,12 @@ def siyahi_kirp(kaynak, bas, son, bakis=8.0):
 
 
 def video_yap(kaynak, parcalar, cikti, bicim, satirlar, baslik=None, altyazi_gom=True, gunluk=print):
-    """parcalar: [[bas, son], ...] -> tek video."""
+    """parcalar: [[bas, son], ...] -> tek video.
+    Donus: videoya giren parcalar [(plandaki_sira, bas, son), ...] (siyahi kirpilmis gercek sinirlar):
+    bolum zamanlari ve altyazi dosyalari bunlara gore hesaplanir."""
     klasor = os.path.dirname(os.path.abspath(cikti))
     ad = os.path.splitext(os.path.basename(cikti))[0]
-    ara = []
+    ara, giren = [], []
     for i, (bas, son) in enumerate(parcalar, 1):
         yeni = siyahi_kirp(kaynak, bas, son)
         if yeni[1] - yeni[0] < 1.5:
@@ -170,9 +172,38 @@ def video_yap(kaynak, parcalar, cikti, bicim, satirlar, baslik=None, altyazi_gom
         p = os.path.join(klasor, "_%s_%03d.mp4" % (ad, i))
         sahne_isle(kaynak, bas, son, p, bicim, satirlar, baslik, altyazi_gom)
         ara.append(p)
+        giren.append((i - 1, bas, son))
     birlestir(ara, cikti)
     for p in ara:
         os.remove(p)
         ass = os.path.splitext(p)[0] + ".ass"
         if os.path.exists(ass):
             os.remove(ass)
+    return giren
+
+
+def bolum_listesi(giren, adlar, en_kisa=10.0):
+    """YouTube bolumleri (chapters): [(saniye, ad), ...]. Kurallar: ilk 00:00, en az 3 bolum, her biri >= 10 sn.
+    Ardisik ayni adli ya da 10 sn'den kisa parcalar oncekiyle birlesir. Kurala uymuyorsa bos liste."""
+    bolumler, t = [], 0.0
+    for sira, bas, son in giren:
+        ad = ((adlar[sira] if sira < len(adlar) else "") or "").strip()
+        if ad and (not bolumler or ad != bolumler[-1][1]):
+            if bolumler and t - bolumler[-1][0] < en_kisa:
+                bolumler[-1][1] = ad  # onceki bolum 10 sn'den kisa: bu bolume katilir
+            else:
+                bolumler.append([t, ad])
+        t += son - bas
+    if bolumler:
+        bolumler[0][0] = 0.0
+    # son bolum de en az 10 sn olmali
+    while len(bolumler) > 1 and t - bolumler[-1][0] < en_kisa:
+        bolumler.pop()
+    return [tuple(b) for b in bolumler] if len(bolumler) >= 3 else []
+
+
+def bolum_metni(bolumler):
+    def zaman(sn):
+        sn = int(sn)
+        return "%d:%02d:%02d" % (sn // 3600, sn // 60 % 60, sn % 60) if sn >= 3600 else "%02d:%02d" % (sn // 60, sn % 60)
+    return "\n".join("%s %s" % (zaman(t), ad) for t, ad in bolumler)

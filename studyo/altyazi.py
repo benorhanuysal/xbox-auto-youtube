@@ -101,10 +101,16 @@ def _srt_zaman(sn):
     return "%02d:%02d:%02d,%03d" % (ms // 3600000, ms // 60000 % 60, ms // 1000 % 60, ms % 1000)
 
 
-def srt_yaz(satirlar, yol):
+def srt_yaz(satirlar, yol, alan="tr"):
+    """alan: "tr" (Turkce) ya da "en" (oyunun Ingilizce altyazisi; YouTube'a ayri altyazi parcasi)."""
     with open(yol, "w", encoding="utf-8") as f:
-        for i, s in enumerate(satirlar, 1):
-            f.write("%d\n%s --> %s\n%s\n\n" % (i, _srt_zaman(s.bas), _srt_zaman(s.son), s.tr))
+        n = 0
+        for s in satirlar:
+            metin = (getattr(s, alan) or "").strip()
+            if metin:
+                n += 1
+                f.write("%d\n%s --> %s\n%s\n\n" % (n, _srt_zaman(s.bas), _srt_zaman(s.son), metin))
+    return n
 
 
 def _ass_zaman(sn):

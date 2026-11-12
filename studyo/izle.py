@@ -165,6 +165,55 @@ def kurgu_isci(ayar, is_kuyrugu):
             bildirim("Kurgu basarisiz", str(e)[:120])
 
 
+# ---------------------------------------------------------------- YouTube: haftalik rapor, yeni yorum bildirimi
+def _iso(metin):
+    try:
+        return datetime.datetime.fromisoformat(metin)
+    except (TypeError, ValueError):
+        return None
+
+
+def youtube_isci(ayar, durdur):
+    """10 dakikada bir: rapor zamani geldiyse raporu cikar, yorum kontrol zamani geldiyse yeni yorumlari say."""
+    from . import youtube
+    while not durdur.wait(600 if ayar["youtube_yukle"] else 3600):
+        if not ayar["youtube_yukle"]:
+            continue
+        try:
+            if not youtube.tam_izin_var_mi():
+                continue
+            simdi = datetime.datetime.now().astimezone()
+            d = youtube.durum_oku()
+            # Haftalik rapor: en az bir video 2 gundur yayindaysa (Analytics ~2 gun gecikmeli)
+            son = _iso(d.get("son_rapor")) or _iso(d.get("son_rapor_deneme"))
+            eski_video = any((_iso(v.get("yukleme")) or simdi) <= simdi - datetime.timedelta(days=2) for v in d["videolar"])
+            if eski_video and (son is None or simdi - son >= datetime.timedelta(days=ayar["rapor_gun"])):
+                d["son_rapor_deneme"] = simdi.isoformat(timespec="seconds")
+                youtube.durum_yaz(d)
+                log.info("haftalik rapor hazirlaniyor")
+                r = subprocess.run([_python_exe(), "-m", "studyo.rapor", "--arka-plan"], cwd=KOK, creationflags=_GIZLI,
+                                   capture_output=True, text=True, encoding="utf-8", errors="replace",
+                                   env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+                if r.returncode == 0:
+                    bildirim("Haftalik kanal raporu hazir", "RAPOR.bat ya da cikti\\raporlar. Dersler bir sonraki kurguya aktarildi.")
+                else:
+                    log.warning("rapor hatasi: %s", (r.stdout + r.stderr)[-300:])
+            # Yeni yorumlar
+            d = youtube.durum_oku()
+            son = _iso(d.get("son_yorum_kontrol"))
+            if son is None or simdi - son >= datetime.timedelta(hours=ayar["yorum_kontrol_saat"]):
+                from . import yorumlar
+                sayi = len(yorumlar.yeniler())
+                d = youtube.durum_oku()
+                d["son_yorum_kontrol"] = simdi.isoformat(timespec="seconds")
+                if sayi and sayi != d.get("son_yorum_bildirimi"):
+                    bildirim("%d yeni YouTube yorumu" % sayi, "Cevaplamak icin YORUMLAR.bat (Claude taslak yazar, sen onaylarsin).")
+                d["son_yorum_bildirimi"] = sayi
+                youtube.durum_yaz(d)
+        except Exception:
+            log.exception("youtube gorevi hatasi")
+
+
 # ---------------------------------------------------------------- ana dongu
 class Bekci:
     def __init__(self, ayar):
@@ -282,6 +331,7 @@ class Bekci:
         durdur = threading.Event()
         threading.Thread(target=isaret_dinle, args=(self.ayar, durdur), daemon=True).start()
         threading.Thread(target=kurgu_isci, args=(self.ayar, self.kuyruk), daemon=True).start()
+        threading.Thread(target=youtube_isci, args=(self.ayar, durdur), daemon=True).start()
         log.info("bekci basladi (oto_kayit=%s, oto_kurgu=%s, isaret=%s%s)", self.ayar["oto_kayit"], self.ayar["oto_kurgu"],
                  self.ayar["isaret_tusu"], " + iki analog" if self.ayar["kumanda_isaret"] else "")
         try:

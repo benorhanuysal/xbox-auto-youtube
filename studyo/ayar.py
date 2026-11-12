@@ -40,6 +40,24 @@ VARSAYILAN = {
     "youtube_yukle": False,
     # private: gizli yuklenir, Studio'da kontrol edip sen yayinlarsin | unlisted: liste disi | public: hemen yayinda
     "youtube_gizlilik": "private",
+    # Ingilizce baslik/aciklama (izleyicinin dili Ingilizceyse YouTube bunlari gosterir)
+    "youtube_ingilizce": True,
+    # Uzun videonun aciklamasina bolumler (00:00 ...) -> YouTube'da bolum cubugu
+    "youtube_bolumler": True,
+    # Oynatma listeleri ({oyun} oyun adiyla degisir); yoksa olusturulur. Bos "" = listeye ekleme
+    "youtube_listeler": {"uzun": "{oyun} Türkçe Altyazılı Oynanış", "shorts": "{oyun} Shorts | Türkçe Altyazılı"},
+    "youtube_liste_aciklamasi": "{oyun} oynanışı, yapay zekâ ile canlı çevrilmiş Türkçe altyazılarla. {kanal}",
+    # Ayri altyazi parcalari (her biri 400 kota birimi; gunluk 10.000). Shorts'ta Turkce zaten videonun ustunde.
+    "youtube_altyazi_dilleri": {"uzun": ["tr", "en"], "shorts": ["en"]},
+    # Zamanlanmis yayin: true ise uzun video ertesi gun youtube_uzun_saat'te, Shorts'lar sonraki gunlerde
+    # birer birer youtube_shorts_saat'te kendiliginden yayina girer (saatler bilgisayarin saat diliminde).
+    "youtube_zamanla": False,
+    "youtube_uzun_saat": "20:00",
+    "youtube_shorts_saat": "18:00",
+    # Performans raporu kac gunde bir (bekci kendisi calistirir; elle: python -m studyo.rapor)
+    "rapor_gun": 7,
+    # Yeni yorum kontrolu kac saatte bir (bildirim gelir; cevaplamak icin YORUMLAR.bat)
+    "yorum_kontrol_saat": 3,
     "cikti_klasoru": "cikti",
     # ---- Bekci (python -m studyo.izle / IZLE.pyw)
     # Xbox uzaktan oynatma baslayinca OBS kaydini baslat, kapaninca durdur

@@ -30,14 +30,47 @@ Make an editing plan:
 3. Turkish metadata for a young Turkish gaming audience for every video: "baslik" (max 90 characters, include
    "{oyun}", an ironic or surprising angle beats a plain description, no lies, no hashtags), "aciklama"
    (2-4 short sentences), "etiketler" (8-15 tags, Turkish and English).
+4. English metadata for international viewers for every video: "baslik_en" (max 90 characters, same angle,
+   natural English, no hashtags) and "aciklama_en" (2-4 short sentences).
+5. For every part of "uzun" give "bolum": a short Turkish chapter title (max 40 characters) for the YouTube chapter
+   list, e.g. "Lester'dan şüpheli teklif", "Motordan uçuş". Consecutive parts of the same moment share the same title.
+
+YouTube monetization policy (the whole channel is reviewed; follow these strictly):
+- Every video must feel individually made, not mass-produced from a template. Vary title structure and opening
+  across videos; do not reuse the formula of the channel's recent titles below. The same pattern on every video is
+  a policy risk even if it performs well.
+- No profanity, slurs or sexual words in titles, descriptions or on-screen Shorts titles. Never misleading: only
+  promise what actually happens in the clip. No shock bait.
+- Describe it as the creator's own gameplay; the added value is the live Turkish translation and the editing.
+Recent titles on this channel (do not copy their structure):
+{son_basliklar}
 
 For each chosen candidate give "id" and optionally tighter "bas"/"son" (must stay inside the candidate's range).
 {serbest}Reply with JSON only, no other text:
-{{"uzun": {{"parcalar": [{{"id": 1, "bas": 10.0, "son": 40.0}}{serbest_ornek}], "baslik": "", "aciklama": "", "etiketler": []}},
- "shorts": [{{"parcalar": [{{"id": 3}}], "baslik": "", "aciklama": "", "etiketler": []}}]}}
-
+{{"uzun": {{"parcalar": [{{"id": 1, "bas": 10.0, "son": 40.0, "bolum": "..."}}{serbest_ornek}], "baslik": "", "aciklama": "",
+  "baslik_en": "", "aciklama_en": "", "etiketler": []}},
+ "shorts": [{{"parcalar": [{{"id": 3}}], "baslik": "", "aciklama": "", "baslik_en": "", "aciklama_en": "", "etiketler": []}}]}}
+{ogrenme}
 Candidate scenes:
 {adaylar}"""
+
+_OGRENME_BOLUMU = """
+Lessons from this channel's own performance data so far. Apply them to WHICH moments you pick and what the
+title is about; keep the title wording and structure varied (policy rule above):
+{dersler}
+"""
+
+_META_KOMUT = """You write YouTube metadata for the channel "{kanal}" ({oyun} gameplay with Turkish subtitles).
+The videos are already edited. Long video parts (seconds in the recording) with the dialogue inside each part:
+{parcalar}
+Current Turkish titles and descriptions:
+{videolar}
+
+Return JSON only, no other text:
+{{"bolumler": ["<short Turkish chapter title per long-video part, max 40 characters, same order>"],
+ "videolar": [{{"baslik_en": "<natural English title, max 90 characters, same angle, no hashtags>",
+               "aciklama_en": "<2-4 short English sentences>"}}]}}
+"videolar" must follow the same order as the titles above."""
 
 _KARE_BOLUMU = """
 Frames: for some scenes there is an image file in the current directory named sahne_<id>.jpg (for example
@@ -70,7 +103,8 @@ def _baslik(metin, sinir):
     return re.sub(r"\s*#\w+", "", str(metin or "")).strip()[:sinir]
 
 
-def _parcalari_dogrula(parcalar, adaylar_sozluk, en_fazla_sn=None, sure_sn=None):
+def _parcalari_dogrula(parcalar, adaylar_sozluk, en_fazla_sn=None, sure_sn=None, adlar=None):
+    """adlar listesi verilirse kabul edilen her parcanin "bolum" adi (yoksa "") ayni sirayla eklenir."""
     sonuc, toplam = [], 0.0
     for p in parcalar or []:
         if not isinstance(p, dict):
@@ -100,8 +134,62 @@ def _parcalari_dogrula(parcalar, adaylar_sozluk, en_fazla_sn=None, sure_sn=None)
                 break
             son = min(son, bas + en_fazla_sn - toplam)
         sonuc.append([round(bas, 2), round(son, 2)])
+        if adlar is not None:
+            adlar.append(str(p.get("bolum") or "").strip()[:60])
         toplam += son - bas
     return sonuc
+
+
+def _ogrenme_metni():
+    """rapor.py'nin yazdigi dersler (kanal performansindan); yoksa bos."""
+    yol = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ogrenme.json")
+    try:
+        with open(yol, encoding="utf-8") as f:
+            dersler = json.load(f).get("dersler") or []
+    except (OSError, ValueError):
+        return ""
+    dersler = [str(d).strip() for d in dersler if str(d).strip()][:12]
+    return _OGRENME_BOLUMU.format(dersler="\n".join("- " + d for d in dersler)) if dersler else ""
+
+
+def _son_basliklar(sayi=12):
+    """youtube_durum.json'daki son yuklenen basliklar: Claude ayni kalibi tekrarlamasin (ozgun olmayan icerik riski)."""
+    from . import youtube
+    basliklar = [v.get("baslik", "") for v in youtube.durum_oku()["videolar"] if v.get("baslik")][-sayi:]
+    return "\n".join("- " + b for b in basliklar) if basliklar else "(none yet)"
+
+
+def _en_alanlari(kaynak, hedef):
+    if kaynak.get("baslik_en"):
+        hedef["baslik_en"] = _baslik(kaynak.get("baslik_en"), 100)
+        hedef["aciklama_en"] = str(kaynak.get("aciklama_en") or "")
+    return hedef
+
+
+def meta_tamamla(plan, satirlar, ayar, klasor, gunluk=print):
+    """Eski planlarda (bolum adlari / Ingilizce baslik yok) eksikleri Claude'a tamamlat. Plan yerinde guncellenir."""
+    videolar = [plan["uzun"]] + list(plan["shorts"])
+    eksik_bolum = plan["uzun"]["parcalar"] and not any(plan["uzun"].get("bolumler") or [])
+    eksik_en = any(not v.get("baslik_en") for v in videolar)
+    if not (eksik_bolum or eksik_en) or not claude.var_mi():
+        return plan
+    parcalar = []
+    for bas, son in plan["uzun"]["parcalar"]:
+        diyalog = [s.en for s in satirlar if s.bas < son and s.son > bas][:8]
+        parcalar.append({"bas": bas, "son": son, "diyalog": diyalog})
+    komut = _META_KOMUT.format(kanal=ayar["kanal"], oyun=ayar["oyun"],
+                               parcalar=json.dumps(parcalar, ensure_ascii=False),
+                               videolar=json.dumps([{"baslik": v["baslik"], "aciklama": v.get("aciklama", "")}
+                                                    for v in videolar], ensure_ascii=False))
+    gunluk("  Claude eksik bilgileri tamamliyor (bolumler, Ingilizce baslik)...")
+    ham = claude.iste(komut, klasor, ayar.get("claude_model"), gunluk) or {}
+    bolumler = ham.get("bolumler") if isinstance(ham, dict) else None
+    if eksik_bolum and isinstance(bolumler, list) and len(bolumler) == len(plan["uzun"]["parcalar"]):
+        plan["uzun"]["bolumler"] = [str(b).strip()[:60] for b in bolumler]
+    for v, m in zip(videolar, (ham.get("videolar") or []) if isinstance(ham, dict) else []):
+        if isinstance(m, dict) and not v.get("baslik_en"):
+            _en_alanlari(m, v)
+    return plan
 
 
 def _yedek_plan(adaylar, ayar):
@@ -132,7 +220,9 @@ def _komut(adaylar, ayar, kare_idleri, ozetler=()):
         shorts=ayar["shorts_sayisi"], short_sn=ayar["shorts_en_uzun_sn"],
         kareler=kareler,
         serbest=_SERBEST if ozetler else "",
-        serbest_ornek=', {"bas": 412, "son": 436}' if ozetler else "",
+        serbest_ornek=', {"bas": 412, "son": 436, "bolum": "..."}' if ozetler else "",
+        ogrenme=_ogrenme_metni(),
+        son_basliklar=_son_basliklar(),
         adaylar=json.dumps([{k: a[k] for k in ("id", "bas", "son", "heyecan", "diyalog", "isaretli") if k in a}
                             for a in adaylar], ensure_ascii=False),
     )
@@ -179,29 +269,32 @@ def plan(adaylar, ayar, kayit_yolu, cikti_klasoru, gunluk=print, planlayicilar=N
         ham = _yedek_plan(adaylar, ayar)
 
     uzun = ham.get("uzun") or {}
-    sonuc = {
-        "uzun": {
-            "parcalar": sorted(_parcalari_dogrula(uzun.get("parcalar"), adaylar_sozluk, sure_sn=sure_sn)),
-            "baslik": _baslik(uzun.get("baslik"), 100),
-            "aciklama": str(uzun.get("aciklama", "")),
-            "etiketler": [str(e) for e in uzun.get("etiketler", [])][:20],
-        },
-        "shorts": [],
-    }
+    adlar = []
+    parcalar = _parcalari_dogrula(uzun.get("parcalar"), adaylar_sozluk, sure_sn=sure_sn, adlar=adlar)
     # Isaretli sahne plana girmediyse (yapay zeka atladiysa) yine de uzun videoya ekle
-    parcalar = sonuc["uzun"]["parcalar"]
     for a in adaylar:
         if a.get("isaretli") and not any(b < a["son"] and s > a["bas"] for b, s in parcalar):
             gunluk("  Isaretli sahne plana eklendi: %.0f-%.0f sn" % (a["bas"], a["son"]))
             parcalar.append([a["bas"], a["son"]])
-    parcalar.sort()
+            adlar.append("İşaretli an")
+    sirali = sorted(zip(parcalar, adlar), key=lambda x: x[0])
+    sonuc = {
+        "uzun": _en_alanlari(uzun, {
+            "parcalar": [p for p, _ in sirali],
+            "bolumler": [a for _, a in sirali],
+            "baslik": _baslik(uzun.get("baslik"), 100),
+            "aciklama": str(uzun.get("aciklama", "")),
+            "etiketler": [str(e) for e in uzun.get("etiketler", [])][:20],
+        }),
+        "shorts": [],
+    }
     for s in (ham.get("shorts") or [])[: ayar["shorts_sayisi"]]:
         parcalar = _parcalari_dogrula(s.get("parcalar"), adaylar_sozluk, ayar["shorts_en_uzun_sn"], sure_sn)
         if parcalar:
-            sonuc["shorts"].append({
+            sonuc["shorts"].append(_en_alanlari(s, {
                 "parcalar": parcalar,
                 "baslik": _baslik(s.get("baslik"), 90),
                 "aciklama": str(s.get("aciklama", "")),
                 "etiketler": [str(e) for e in s.get("etiketler", [])][:15],
-            })
+            }))
     return sonuc
