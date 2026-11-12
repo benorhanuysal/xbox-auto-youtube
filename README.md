@@ -105,7 +105,9 @@ Oynarken: uzaktan oynatma açıkken **Telegram kumandasından** 🔴 *Yayını b
 - **Mahremiyet:** OBS PC ekranının tamamını yakalar. Yayındayken bekçinin bildirimleri susar; uzaktan oynatma 4 sn kesilirse ekran gizlenir (izleyici siyah ekran görür, masaüstünü değil); oturum bitince (1 dk) yayın kendiliğinden kapanır. Diğer uygulamaların bildirimleri için Windows'ta *Ayarlar → Sistem → Bildirimler → Rahatsız etmeyi otomatik aç → Tam ekran modunda bir uygulama kullanırken*'i aç.
 - **Luna:** Uzaktan oynatma başlayınca kapalıysa bekçi açar (`luna_oto_baslat`).
 
-Ayarlar: `yayin_bit_hizi` (6000), `yayin_ekran_gizle_sn` (4), `yayin_tusu` (boş = klavye kısayolu yok; istersen `"F10"`). Katmanı denemek: `python -m studyo.yayin --dene` (örnek altyazıyla OBS görüntüsü alır).
+**Chat ve takip/abone bildirimleri (BotRix):** [botrix.live](https://botrix.live)'a Kick hesabıyla gir; *Alerts* (takip, abone, hediye abonelik, baskın) ve *Chat* widget'larının "Browser Source" adreslerini kopyala, bir metin dosyasına `chat: https://...` ve `alerts: https://...` satırları olarak yaz, sonra `python -m studyo.yayin --katmanlar --dosya botrix.txt`. İkisi de yalnız yayında görünür. Chat kutusu sağda (`yayin_chat_kutusu`, varsayılan `[1480, 170, 420, 420]`): dikey Shorts ortadan kesildiği için oraya girmez, GTA'nın sağ üst HUD'u ve sağ alttaki telefon açık kalır. Yayın kaydından yapılan **uzun videoda bu alan otomatik bulanıklaştırılır** (izleyici mesajları YouTube'a gitmesin). Bildirim sesleri yalnız 1. ses kanalına (videoya) gider; mikrofon kanalına girip "konuşma" sanılmaz. Adresler `kick_katmanlari.json`'da (git'e girmez; içinde kişisel anahtar var).
+
+Ayarlar: `yayin_bit_hizi` (7800), `yayin_ekran_gizle_sn` (4), `yayin_tusu` (boş = klavye kısayolu yok; istersen `"F10"`). Katmanı denemek: `python -m studyo.yayin --dene` (örnek altyazıyla OBS görüntüsü alır).
 
 ## Telegram kumandası
 Koltuktan, telefondan: sohbetin altında sabit tuşlar.

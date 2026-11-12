@@ -261,7 +261,10 @@ def main():
     if plan["uzun"]["parcalar"]:
         _yaz("  Uzun video")
         dosya = os.path.join(cikti, "uzun.mp4")
-        giren = kurgu.video_yap(yol, plan["uzun"]["parcalar"], dosya, "yatay", gomulecek, None, ayar["altyazi_gom"], _yaz)
+        # Yayin parcalarinda Kick chat kutusu goruntudeydi: uzun videoda bulaniklasir (Shorts'a zaten girmez)
+        sohbet_kutusu = ayar["yayin_chat_kutusu"] if canli and yayin.katmanlar_var_mi() else None
+        giren = kurgu.video_yap(yol, plan["uzun"]["parcalar"], dosya, "yatay", gomulecek, None, ayar["altyazi_gom"], _yaz,
+                                sohbet_kutusu, canli)
         # Kapak: en heyecanli secilen sahnenin ortasi
         en_iyi = max(plan["uzun"]["parcalar"], key=lambda p: heyecan[int(p[0]):int(p[1]) + 1].max() if len(heyecan) else 0)
         kurgu.kucuk_resim(yol, (en_iyi[0] + en_iyi[1]) / 2, os.path.join(cikti, "uzun_kapak.jpg"))

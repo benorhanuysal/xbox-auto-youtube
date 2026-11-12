@@ -16,6 +16,8 @@ MIKROFON = "Mikrofon"
 # Canli yayin altyazi katmani: yalniz yayin surerken gorunur (kayitta kurgu kendi duzeltilmis altyazisini gomer)
 KATMAN = "Turkce altyazi (yayin)"
 KATMAN_HTML = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "yayin", "altyazi.html")
+# Kick chat ve takip/abone bildirimleri (BotRix web adresleri, studyo.yayin --katmanlar); bunlar da yalniz yayinda
+WEB_KATMANLARI = {"chat": "Kick chat (yayin)", "bildirim": "Kick bildirimleri (yayin)"}
 # Kayit ses kanallari: 1 = videoya giren karisim (oyun + mikrofon), 2 = yalniz mikrofon (kurgu konusmayi bulur)
 KANAL_KARISIM, KANAL_MIKROFON = "1", "2"
 KAYIT_KANALLARI = "3"  # OBS Basit cikti: bit maskesi, 1|2 = kanal 1 ve 2
@@ -163,7 +165,37 @@ def _katman_kur(cl):
 
 
 def katman_goster(cl, acik):
+    """Yalniz yayinda gorunen her sey: Turkce altyazi + (kuruluysa) Kick chat ve bildirimleri."""
     cl.set_scene_item_enabled(SAHNE, _oge(cl, KATMAN), bool(acik))
+    for ad in WEB_KATMANLARI.values():
+        try:
+            cl.set_scene_item_enabled(SAHNE, _oge(cl, ad), bool(acik))
+        except Exception:
+            pass  # kurulmamis
+
+
+def web_katmani_kur(cl, tur, url, kutu=None):
+    """BotRix gibi bir web adresini sahneye koyar. kutu [x, y, g, y] (1920x1080) yoksa tam ekran.
+    Bildirim sesleri OBS'e alinir (reroute_audio) ve YALNIZ 1. kanala (videoya giren karisim) gider:
+    2. kanal mikrofon kanali; oraya girse kurgu bildirim sesini 'konusma' sanardi."""
+    ad = WEB_KATMANLARI[tur]
+    x, y, g, h = kutu or (0, 0, 1920, 1080)
+    ayar = {"is_local_file": False, "url": url, "width": g, "height": h, "reroute_audio": True,
+            "shutdown": False, "restart_when_active": False}
+    try:
+        cl.get_input_settings(ad)
+        cl.set_input_settings(ad, ayar, True)
+    except Exception:
+        cl.create_input(SAHNE, ad, "browser_source", ayar, False)
+        time.sleep(0.5)
+    cl.set_input_audio_tracks(ad, _kanallar((KANAL_KARISIM,)))
+    oge = _oge(cl, ad)
+    cl.set_scene_item_transform(SAHNE, oge, {"positionX": x, "positionY": y, "alignment": 5,
+                                             "scaleX": 1.0, "scaleY": 1.0, "boundsType": "OBS_BOUNDS_NONE"})
+    # Altyazinin altinda, oyunun ustunde
+    ogeler = cl.get_scene_item_list(SAHNE).scene_items
+    cl.set_scene_item_index(SAHNE, oge, max(0, len(ogeler) - 2))
+    cl.set_scene_item_index(SAHNE, _oge(cl, KATMAN), len(ogeler) - 1)
 
 
 def ekran_goster(cl, acik):

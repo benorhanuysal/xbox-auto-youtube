@@ -83,6 +83,10 @@ VARSAYILAN = {
     "yayin_tusu": "",
     "yayin_bit_hizi": 7800,   # kbps; Kick en fazla 8000 (ses 160 ile toplam ~7960). Upload >= 12 Mbit olmali
     "yayin_on_ayar": "p6",    # NVENC: p5 hizli, p6 daha temiz (oyun Xbox'ta, PC'nin GPU'su bos), p7 en yavas
+    # Kick chat kutusu (BotRix): [x, y, genislik, yukseklik], 1920x1080'de. Sagda: dikey Shorts ortadan kesildigi
+    # icin oraya girmez; GTA'nin sag ust HUD'u (para/silah) ve sag alttaki telefon acik kalir.
+    # Yayin kaydindan yapilan UZUN videoda bu alan bulaniklastirilir (izleyici mesajlari YouTube'a gitmesin).
+    "yayin_chat_kutusu": [1480, 170, 420, 420],
     # Yayindayken uzaktan oynatma bu kadar sn kesilirse ekran gizlenir (masaustu izleyiciye gorunmesin)
     "yayin_ekran_gizle_sn": 4,
     "obs_exe": r"C:\Program Files\obs-studio\bin\64bit\obs64.exe",
