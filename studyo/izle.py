@@ -330,6 +330,13 @@ def youtube_isci(ayar, durdur):
                 youtube.durum_yaz(d)
         except Exception:
             log.exception("youtube gorevi hatasi")
+        # Instagram Reels: YouTube'da herkese acik olan Shorts (karar Studio'da). Canli yayinda yukleme yapilmaz.
+        try:
+            from . import instagram, yayin
+            if ayar.get("instagram_paylas") and instagram.hazir_mi() and not os.path.exists(yayin.BAYRAK):
+                instagram.takip_et(ayar.get("instagram_ek", ""), gunluk=log.info, bildir=bildirim)
+        except Exception:
+            log.exception("instagram gorevi hatasi")
 
 
 # ---------------------------------------------------------------- ana dongu

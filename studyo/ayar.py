@@ -58,6 +58,12 @@ VARSAYILAN = {
     "rapor_gun": 7,
     # Yeni yorum kontrolu kac saatte bir (bildirim gelir; cevaplamak icin YORUMLAR.bat)
     "yorum_kontrol_saat": 3,
+    # Instagram Reels (kurulum: instagram.json, README > "Instagram Reels"): YouTube'da herkese acik olan
+    # (Studio'da yayinladigin ya da zamani gelen) Shorts, bekci tarafindan Instagram'a da yayinlanir.
+    # Instagram API'sinde gizli/taslak yok: giden Reels hemen herkese aciktir, karar YouTube'da verilir.
+    "instagram_paylas": True,
+    # Reels aciklamasinin sonuna eklenir (Instagram'da link tiklanmaz, kanal adi yazilir)
+    "instagram_ek": "📺 Tam videolar YouTube'da: Night Drive Club\n\n#GTAV #GTA5 #türkçealtyazı #gaming #reels",
     "cikti_klasoru": "cikti",
     # ---- Bekci (python -m studyo.izle / IZLE.pyw)
     # Xbox uzaktan oynatma baslayinca OBS kaydini baslat, kapaninca durdur

@@ -165,8 +165,29 @@ Eski bir kaydın videolarını yeniden yüklemeden tamamlamak: `python -m studyo
 ### Yorumlar
 Bekçi 3 saatte bir cevaplanmamış yorumları sayar, varsa bildirim gönderir. **`YORUMLAR.bat`**: Claude her yoruma kısa, samimi bir cevap taslağı yazar (spam ve cevap gerektirmeyenlere yazmaz); **Enter** gönderir, **d** ile kendin yazarsın, **a** atlar. Hiçbir cevap onayın olmadan gitmez.
 
+## Instagram Reels
+YouTube'da **herkese açık** olan Shorts (Studio'da yayınladığın ya da zamanı gelip açılan) Instagram'a da Reels olarak gider. Bekçi 10 dakikada bir bakar; canlı yayında bekler. Instagram API'sinde gizli/taslak yükleme olmadığı için karar YouTube'da verilir: YouTube'da gizli kalan Shorts Instagram'a gitmez. Her yayında Telegram'a "📸 Reels yayınlandı" bildirimi gelir.
+
+- Dosya doğrudan PC'den gönderilir (`upload_type=resumable`, internete açık bir adres gerekmez).
+- Shorts ~24 Mbps ortalamayla çıkıyor; Instagram sınırı 25 Mbps olduğu için ayrı bir kopya (`short_N_reels.mp4`, tepe 20 Mbps, AAC 128k) gider. YouTube'daki kalite değişmez.
+- Açıklama `yukleme_bilgisi.txt`'ten gelir (başlık + kısa açıklama) + `instagram_ek` ayarı (kanal adı, hashtag'ler).
+- Aynı Shorts 3 kez başarısız olursa bırakılır ve bildirim gelir.
+
+**Kurulum (bir kez):**
+1. Instagram hesabı **Profesyonel** (İçerik Üreticisi ya da İşletme) olmalı.
+2. [developers.facebook.com](https://developers.facebook.com/apps/) → **Create App** → use case **"Manage messaging & content on Instagram"**. Kişisel Facebook hesabıyla girilir; Business Suite girişi geliştirici sitesine yönlendirmez.
+3. Use case → **Customize** → **API setup with Unified login**: işletme portföyünü bağla (zorunlu; **Enter business ID** ile kanalın portföyü).
+4. **App roles → Add People → Instagram Tester** → Instagram kullanıcı adı. Daveti instagram.com/accounts/manage_access → **Tester Invites**'tan kabul et.
+5. **2. Generate access tokens → Add account → Generate token**. Bu sistem kullanıcısı anahtarının (`EAA…`) süresi dolmaz.
+6. Kökte `instagram.json` (git'e girmez):
+   ```json
+   {"erisim_anahtari": "EAA...", "ig_kullanici_id": "1784...", "graph": "https://graph.facebook.com/v24.0"}
+   ```
+   `ig_kullanici_id`: Instagram hesabının 17 haneli kimliği (panelde hesabın yanında yazar).
+7. Kontrol: `python -m studyo.instagram --durum` · yayınlamadan deneme: `--dene short_1.mp4` · elle: `--paylas`
+
 ## Gizlilik
-`ayarlar.json`, `client_secret.json`, `token.json`, kayıtlar ve `cikti/` git'e girmez (`.gitignore`). Yapay zekâya yalnızca diyalog metni, sahne zamanları ve (Claude'da) sahne kareleri gider; kaydın tamamı gönderilmez.
+`ayarlar.json`, `client_secret.json`, `token.json`, `instagram.json`, kayıtlar ve `cikti/` git'e girmez (`.gitignore`). Yapay zekâya yalnızca diyalog metni, sahne zamanları ve (Claude'da) sahne kareleri gider; kaydın tamamı gönderilmez.
 
 ## Lisans
 [MIT](LICENSE)
