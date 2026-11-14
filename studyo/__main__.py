@@ -266,6 +266,14 @@ def main():
         giren = kurgu.video_yap(yol, s["parcalar"], dosya, "dikey", satirlar, s["baslik"], ayar["altyazi_gom"], _yaz)
         bilgi["short_%d" % i] = {"parcalar": giren, "sure_sn": _altyazi_dosyalari("short_%d" % i, giren)}
     _kurgu_bilgisi_yaz(cikti, bilgi)
+    if plan["shorts"] and ayar.get("instagram_paylas") and ayar.get("instagram_kapak", True):
+        # Reels kapaklari simdi (kayit elde, Claude acik): klasorde videolarla birlikte gorunur, Instagram'a
+        # giderken hazir olur. Kurgu yeniden yapildiysa Shorts degismis olabilir: kapaklar da yeniden.
+        try:
+            from . import kapak
+            kapak.hazirla(cikti, ayar, _yaz, yeniden=True)
+        except Exception as e:
+            _yaz("  Reels kapagi hazirlanamadi (Instagram'a giderken tekrar denenir): %s" % str(e)[:150])
     videolar = _videolar_listesi(cikti, plan, bilgi)
 
     _yaz("5/5 Yukleme bilgileri")

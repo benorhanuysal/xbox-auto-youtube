@@ -173,6 +173,13 @@ YouTube'da **herkese açık** olan Shorts (Studio'da yayınladığın ya da zama
 - Açıklama `yukleme_bilgisi.txt`'ten gelir (başlık + kısa açıklama) + `instagram_ek` ayarı (kanal adı, hashtag'ler).
 - Aynı Shorts 3 kez başarısız olursa bırakılır ve bildirim gelir.
 
+**Kapak:** her Shorts'a kanalın renkleriyle bir Reels kapağı yapılır (`short_N_kapak.jpg`, kurgu bitince klasörde).
+- Kare kaynak kayıttan alınır, yani Shorts'taki gömülü başlık ve altyazı kapağa girmez. Kareyi ve 2-5 kelimelik kanca yazısını Claude seçer; Claude yoksa kare netlik/renk ölçüsüyle, yazı başlıktan seçilir.
+- Yazı dikey ortadadır: Reels sekmesi (9:16), profil ızgarası (orta 3:4) ve akış (orta 1:1) kırpımlarının hepsinde görünür.
+- Instagram kapağı dosya olarak almıyor, bir internet adresinden kendisi indiriyor. Bu yüzden kapak bu deponun `reels-kapak` sürümüne geçici yüklenir ve Reels gidince silinir. Jeton olarak git'in kayıtlı GitHub girişi kullanılır, ek kurulum gerekmez.
+- Adres kurulamazsa Instagram'a aynı kare videonun içinden verilir (`thumb_offset`).
+- Elle yapmak için: `python -m studyo.kapak cikti\KLASOR [--yeniden]`. Kapatmak için: `"instagram_kapak": false`.
+
 **Kurulum (bir kez):**
 1. Instagram hesabı **Profesyonel** (İçerik Üreticisi ya da İşletme) olmalı.
 2. [developers.facebook.com](https://developers.facebook.com/apps/) → **Create App** → use case **"Manage messaging & content on Instagram"**. Kişisel Facebook hesabıyla girilir; Business Suite girişi geliştirici sitesine yönlendirmez.

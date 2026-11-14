@@ -8,6 +8,10 @@ Akis (Instagram API, Facebook altyapisi): kap olustur (media_type=REELS, upload_
 rupload.facebook.com'a dogrudan gonder (internete acik bir adres gerekmez) -> Instagram isleyene kadar bekle
 (status_code FINISHED) -> media_publish. Yayinlanmayan kap 24 saatte kendiliginden silinir.
 
+Kapak (kapak.py): Shorts'tan Claude'un sectigi kare + kisa kanca yazisi. Instagram kapagi dosya olarak almiyor,
+kap olusurken bir adresten indiriyor (cover_url); kapak GitHub'a gecici yuklenir (barinak.py), sonra silinir.
+Adres kurulamazsa ayni kare videonun icinden secilir (thumb_offset).
+
 Reels sartlari: H.264, en fazla 25 Mbps, AAC 48 kHz, moov basta, 3 sn - 15 dk, 300 MB. Shorts ~24 Mbps ortalama
 ile cikiyor (anlik tepeler sinirin ustune cikabilir), bu yuzden Instagram'a tepesi 20 Mbps ile sinirli ayri bir
 kopya gider (short_N_reels.mp4); YouTube'daki kalite degismez.
@@ -180,8 +184,9 @@ def aciklama_olustur(cikti, etiket, ek=""):
 
 
 # ---------------------------------------------------------------- yayin akisi
-def reels_gonder(dosya, aciklama, yayinla=True, gunluk=print, a=None):
-    """Kap + dogrudan yukleme + isleme bekleme (+ yayin). Donus: {"kap": id, "ig_id": id|None, "permalink": url|None}."""
+def reels_gonder(dosya, aciklama, yayinla=True, gunluk=print, a=None, kapak_url=None, kapak_sn=None):
+    """Kap + dogrudan yukleme + isleme bekleme (+ yayin). Donus: {"kap": id, "ig_id": id|None, "permalink": url|None}.
+    kapak_url: herkese acik JPEG adresi (Instagram kendisi indirir). Yoksa kapak_sn: videonun o saniyesindeki kare."""
     a = a or ayar_oku()
     if a is None:
         raise MetaHatasi("instagram.json yok ya da eksik (README > Instagram Reels)")
@@ -193,10 +198,24 @@ def reels_gonder(dosya, aciklama, yayinla=True, gunluk=print, a=None):
         veri = f.read()
     # rupload, yeni olusturulan kabi bazen henuz taniyamiyor ve "ProcessingFailedError" donuyor (olculdu: ayni
     # dosya/aciklama bir denemede geciyor, digerinde reddediliyor). Kisa bekleyip tekrar dene; olmazsa yeni kap.
+    alanlar = {"media_type": "REELS", "upload_type": "resumable", "caption": aciklama, "share_to_feed": "true"}
+    if kapak_url:
+        alanlar["cover_url"] = kapak_url
+    elif kapak_sn is not None:
+        alanlar["thumb_offset"] = str(int(kapak_sn * 1000))
     son_hata = None
     for kap_denemesi in range(3):
-        kap = _istek(a, "POST", "/%s/media" % ig, {"media_type": "REELS", "upload_type": "resumable",
-                                                  "caption": aciklama, "share_to_feed": "true"})
+        try:
+            kap = _istek(a, "POST", "/%s/media" % ig, alanlar)
+        except MetaHatasi as e:
+            # Instagram kapagi kap olusurken indirir; alamazsa (2207052) kapaksiz degil, videodan kareyle devam
+            if "cover_url" not in alanlar:
+                raise
+            gunluk("  kapak alinamadi (%s), videodan kare ile devam" % str(e)[:120])
+            del alanlar["cover_url"]
+            if kapak_sn is not None:
+                alanlar["thumb_offset"] = str(int(kapak_sn * 1000))
+            kap = _istek(a, "POST", "/%s/media" % ig, alanlar)
         kap_id = kap["id"]
         gunluk("  kap: %s, yukleniyor (%.1f MB)" % (kap_id, boyut / 1048576))
         url = kap.get("uri") or "%s/%s/%s" % (UPLOAD, a["graph"].rsplit("/", 1)[-1], kap_id)
@@ -277,6 +296,31 @@ def bekleyenler(gunluk=print):
     return sonuc
 
 
+def _kapak(v, gunluk):
+    """(herkese acik kapak adresi, GitHub varlik kimligi, kapak karesinin saniyesi). Kapak yoksa hazirlanir
+    (Claude kareyi ve yaziyi secer). Adres kurulamazsa yalniz saniye doner: Instagram o kareyi kapak yapar."""
+    from . import barinak, kapak
+    from .ayar import yukle
+
+    ayar = yukle()
+    m = re.match(r"SHORTS\s+(\d+)", v.get("etiket", ""))
+    if not ayar.get("instagram_kapak", True) or not m:
+        return None, None, None
+    try:
+        k = kapak.hazirla(v["cikti"], ayar, gunluk).get(int(m.group(1)))
+    except Exception as e:
+        gunluk("  kapak hazirlanamadi: %s" % str(e)[:150])
+        return None, None, None
+    if not k:
+        return None, None, None
+    try:
+        url, varlik = barinak.yukle(k["yol"], "kapak_%s_%s.jpg" % (v["id"], time.strftime("%Y%m%d%H%M%S")))
+        return url, varlik, k.get("kare_sn")
+    except Exception as e:
+        gunluk("  kapak adresi kurulamadi (%s), videodan kare kullanilacak" % str(e)[:150])
+        return None, None, k.get("kare_sn")
+
+
 def takip_et(ek="", gunluk=print, bildir=None, en_fazla=3):
     """Bekleyen Shorts'u (eskiden yeniye) Reels olarak yayinla. Donus: yayinlanan sayisi."""
     a = ayar_oku()
@@ -286,9 +330,12 @@ def takip_et(ek="", gunluk=print, bildir=None, en_fazla=3):
     sayi = 0
     for v in bekleyen:
         gunluk("Instagram: %s (%s)" % (v["baslik"], v["id"]))
+        varlik = None
         try:
             dosya = reels_kopyasi(v["dosya"], gunluk)
-            sonuc = reels_gonder(dosya, aciklama_olustur(v["cikti"], v["etiket"], ek), True, gunluk, a)
+            kapak_url, varlik, kapak_sn = _kapak(v, gunluk)
+            sonuc = reels_gonder(dosya, aciklama_olustur(v["cikti"], v["etiket"], ek), True, gunluk, a,
+                                 kapak_url, kapak_sn)
         except Exception as e:
             d = durum_oku()
             h = d["hatalar"].setdefault(v["id"], {"sayi": 0})
@@ -298,6 +345,13 @@ def takip_et(ek="", gunluk=print, bildir=None, en_fazla=3):
             if bildir and h["sayi"] >= EN_FAZLA_DENEME:
                 bildir("Instagram: Reels gonderilemedi", "%s\n%s" % (v["baslik"][:80], str(e)[:150]))
             continue
+        finally:
+            if varlik:  # Instagram kapagi kap olusurken indirdi; GitHub'daki gecici kopya artik gereksiz
+                try:
+                    from . import barinak
+                    barinak.sil(varlik)
+                except Exception as e:
+                    gunluk("  gecici kapak silinemedi (bir gun sonra kendiliginden temizlenir): %s" % str(e)[:100])
         d = durum_oku()
         d["paylasilan"][v["id"]] = {"ig_id": sonuc["ig_id"], "permalink": sonuc["permalink"], "tarih": _simdi(),
                                     "dosya": v["dosya"], "baslik": v["baslik"]}
@@ -320,6 +374,7 @@ def main(argv=None):
     g.add_argument("--durum", action="store_true", help="baglanti, kota ve bekleyen Shorts")
     g.add_argument("--dene", metavar="DOSYA", help="kap + yukleme + isleme, YAYINLAMAZ")
     g.add_argument("--paylas", action="store_true", help="YouTube'da herkese acik Shorts'u Reels olarak yayinla")
+    p.add_argument("--kapak", metavar="JPG", help="--dene ile: bu kapagi da gonder (GitHub'a gecici yuklenir)")
     args = p.parse_args(argv)
     from .ayar import yukle
 
@@ -335,7 +390,16 @@ def main(argv=None):
             print("  paylasildi: %s -> %s" % (yid, s.get("permalink")))
     elif args.dene:
         dosya = reels_kopyasi(os.path.abspath(args.dene))
-        print(reels_gonder(dosya, "deneme (yayinlanmaz)", yayinla=False))
+        url = varlik = None
+        if args.kapak:
+            from . import barinak
+            url, varlik = barinak.yukle(os.path.abspath(args.kapak))
+            print("kapak adresi: %s" % url)
+        try:
+            print(reels_gonder(dosya, "deneme (yayinlanmaz)", yayinla=False, kapak_url=url))
+        finally:
+            if varlik:
+                barinak.sil(varlik)
     else:
         print("Yayinlanan: %d" % takip_et(ayar.get("instagram_ek", "")))
 

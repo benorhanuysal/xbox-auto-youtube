@@ -62,6 +62,9 @@ VARSAYILAN = {
     # (Studio'da yayinladigin ya da zamani gelen) Shorts, bekci tarafindan Instagram'a da yayinlanir.
     # Instagram API'sinde gizli/taslak yok: giden Reels hemen herkese aciktir, karar YouTube'da verilir.
     "instagram_paylas": True,
+    # Reels kapagi: Shorts'tan en iyi kare + kisa kanca yazisi (short_N_kapak.jpg; Claude secer). Kapak GitHub
+    # deposunun "reels-kapak" surumune gecici yuklenir, Instagram alinca silinir. false: Instagram ilk kareyi koyar.
+    "instagram_kapak": True,
     # Reels aciklamasinin sonuna eklenir (Instagram'da link tiklanmaz, kanal adi yazilir)
     "instagram_ek": "📺 Tam videolar YouTube'da: Night Drive Club\n\n#GTAV #GTA5 #türkçealtyazı #gaming #reels",
     "cikti_klasoru": "cikti",

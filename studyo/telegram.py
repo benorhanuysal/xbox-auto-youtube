@@ -96,6 +96,31 @@ def gonder(metin, klavye=True):
         return False
 
 
+def foto_gonder(yol, aciklama=""):
+    """Eslesen sohbete resim (ornegin Reels kapagi); ayarli degilse ya da ag yoksa sessizce False."""
+    a = oku()
+    if not (a.get("token") and a.get("sohbet")):
+        return False
+    sinir = "----studyo%d" % int(time.time() * 1000)
+    with open(yol, "rb") as f:
+        resim = f.read()
+    parcalar = []
+    for ad, deger in (("chat_id", str(a["sohbet"])), ("caption", aciklama[:1000])):
+        parcalar.append(('--%s\r\nContent-Disposition: form-data; name="%s"\r\n\r\n%s\r\n' % (sinir, ad, deger))
+                        .encode("utf-8"))
+    parcalar.append(('--%s\r\nContent-Disposition: form-data; name="photo"; filename="%s"\r\n'
+                     'Content-Type: image/jpeg\r\n\r\n' % (sinir, os.path.basename(yol))).encode("utf-8"))
+    govde = b"".join(parcalar) + resim + ("\r\n--%s--\r\n" % sinir).encode("utf-8")
+    istek = urllib.request.Request(_API % (a["token"], "sendPhoto"), data=govde,
+                                   headers={"Content-Type": "multipart/form-data; boundary=" + sinir})
+    try:
+        with urllib.request.urlopen(istek, timeout=60) as r:
+            return bool(json.load(r).get("ok"))
+    except Exception as e:
+        log.warning("telegram resmi gonderilemedi: %s", e)
+        return False
+
+
 def yetkili_mi(m, sohbet):
     """Yalniz sahibin bota OZEL sohbetten yazdigi mesaj: sohbet de gonderen de eslesen hesap olmali
     (bot bir gruba eklense bile oradaki mesajlar, sahibinkiler dahil, gecmez)."""
